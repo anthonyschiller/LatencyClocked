@@ -1,0 +1,158 @@
+package golden;
+
+import com.ll.metrics.latency.annotations.Timed;
+
+public final class GoldenTimedSamples {
+  public int sideEffect;
+
+  @Timed
+  public void successfulVoid() {
+    sideEffect++;
+  }
+
+  @Timed
+  public int primitiveReturn(int value) {
+    return value + 1;
+  }
+
+  @Timed
+  public String objectReturn(String value) {
+    return "object:" + value;
+  }
+
+  @Timed
+  public static int staticPrimitive(int value) {
+    return value * 2;
+  }
+
+  @Timed
+  public int multipleReturnPaths(int value) {
+    if (value < 0) {
+      return -1;
+    }
+    if (value == 0) {
+      return 0;
+    }
+    return 1;
+  }
+
+  @Timed
+  public int nestedBranching(int value) {
+    if (value < 0) {
+      if (value < -10) {
+        sideEffect += 100;
+        return -100;
+      }
+      sideEffect += 10;
+      return -10;
+    }
+    if (value == 0) {
+      sideEffect += 1;
+      return 0;
+    }
+    sideEffect += 2;
+    return 10;
+  }
+
+  @Timed
+  public String switchStatement(int value) {
+    switch (value) {
+      case 0:
+        return "zero";
+      case 1:
+      case 2:
+        return "small";
+      default:
+        return "large";
+    }
+  }
+
+  @Timed
+  public int loopWithEarlyReturn(int limit) {
+    for (int index = 0; index < limit; index++) {
+      sideEffect++;
+      if (index == 2) {
+        return index;
+      }
+    }
+    return -1;
+  }
+
+  @Timed
+  public int tryCatchReturningFromCatch(boolean fail) {
+    try {
+      if (fail) {
+        throw new IllegalArgumentException("catch me");
+      }
+      return 10;
+    } catch (IllegalArgumentException exception) {
+      sideEffect += 3;
+      return 20;
+    }
+  }
+
+  @Timed
+  public int tryFinallyReturningNormally(int value) {
+    try {
+      return value + 1;
+    } finally {
+      sideEffect += 4;
+    }
+  }
+
+  @Timed
+  public void throwingMethod() {
+    throw new IllegalStateException("boom");
+  }
+
+  @Timed
+  public int exceptionThrownBeforeReturn() {
+    sideEffect += 5;
+    throw new IllegalStateException("before return");
+  }
+
+  @Timed
+  public int exceptionThrownInsideCatch() {
+    try {
+      throw new IllegalArgumentException("original");
+    } catch (IllegalArgumentException exception) {
+      sideEffect += 6;
+      throw new IllegalStateException("inside catch", exception);
+    }
+  }
+
+  public int callPrivateTimedMethod(int value) {
+    return privateTimedMethod(value);
+  }
+
+  @Timed
+  private int privateTimedMethod(int value) {
+    sideEffect += 7;
+    return value + 7;
+  }
+
+  @Timed
+  public final int finalTimedMethod(int value) {
+    return value + 8;
+  }
+
+  @Timed
+  public synchronized int synchronizedTimedMethod(int value) {
+    sideEffect += 9;
+    return value + 9;
+  }
+
+  @Timed
+  public int overloaded(int value) {
+    return value + 10;
+  }
+
+  @Timed
+  public String overloaded(String value) {
+    return "overloaded:" + value;
+  }
+
+  public void normalMethod() {
+    sideEffect += 10;
+  }
+}
