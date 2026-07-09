@@ -5,11 +5,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.ll.metrics.latency.constants.LatencyClockedConstants;
-import com.ll.metrics.latency.core.InMemoryTimers;
-import com.ll.metrics.latency.core.Timer;
-import com.ll.metrics.latency.core.Timers;
 import com.ll.metrics.latency.maven.model.LatencyDescriptorEntry;
 import com.ll.metrics.latency.maven.samples.SampleTimedClass;
+import com.ll.metrics.latency.timer.InMemoryTimers;
+import com.ll.metrics.latency.timer.Timer;
+import com.ll.metrics.latency.timer.Timers;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Field;
@@ -121,7 +121,7 @@ class LatencyDescriptorGeneratorTest {
   }
 
   @Test
-  void generatedFieldNamesUsePlaceholderSequence() throws IOException {
+  void generatedTimerFieldNamesAreSequenced() throws IOException {
     List<LatencyDescriptorEntry> entries =
         entriesIn(LatencyDescriptorGenerator.scan(Path.of("target", "test-classes")));
 
@@ -258,7 +258,7 @@ class LatencyDescriptorGeneratorTest {
     List<LatencyDescriptorEntry> entries = scanInjectAndWriteDescriptor(outputDirectory);
     LatencyDescriptorEntry entry = entries.getFirst();
     Class<?> instrumentedClass = loadInstrumentedClass(outputDirectory, SampleTimedClass.class);
-    Timers timers = new InMemoryTimers();
+    Timers timers = InMemoryTimers.create();
 
     Method bindMethod = instrumentedClass.getDeclaredMethod("__latency_clocked$bind", Timers.class);
     bindMethod.setAccessible(true);

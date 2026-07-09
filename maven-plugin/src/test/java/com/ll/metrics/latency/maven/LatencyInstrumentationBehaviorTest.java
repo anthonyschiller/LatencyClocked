@@ -5,11 +5,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.ll.metrics.latency.constants.LatencyClockedConstants;
-import com.ll.metrics.latency.core.InMemoryTimers;
 import com.ll.metrics.latency.core.LatencyClocked;
-import com.ll.metrics.latency.core.LatencySnapshot;
-import com.ll.metrics.latency.core.Timers;
 import com.ll.metrics.latency.maven.model.LatencyDescriptorEntry;
+import com.ll.metrics.latency.snapshot.LatencySnapshot;
+import com.ll.metrics.latency.timer.InMemoryTimers;
+import com.ll.metrics.latency.timer.Timers;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
@@ -27,202 +27,219 @@ class LatencyInstrumentationBehaviorTest {
 
   @Test
   void successfulVoidMethodRecordsExactlyOnce(@TempDir Path outputDirectory) throws Exception {
-    RuntimeFixture fixture = instrumentAndLoad(outputDirectory);
-    Object instance = fixture.newInstance();
+    try (RuntimeFixture fixture = instrumentAndLoad(outputDirectory)) {
+      Object instance = fixture.newInstance();
 
-    invoke(instance, "successfulVoid");
+      invoke(instance, "successfulVoid");
 
-    assertEquals(1, snapshot(fixture.timers(), "successfulVoid").count());
-    assertTrue(snapshot(fixture.timers(), "successfulVoid").min() >= 0);
-    assertEquals(1, fieldValue(instance, "sideEffect"));
+      assertEquals(1, snapshot(fixture.timers(), "successfulVoid").count());
+      assertTrue(snapshot(fixture.timers(), "successfulVoid").min() >= 0);
+      assertEquals(1, fieldValue(instance, "sideEffect"));
+    }
   }
 
   @Test
   void primitiveReturnRecordsOnceAndPreservesReturnValue(@TempDir Path outputDirectory)
       throws Exception {
-    RuntimeFixture fixture = instrumentAndLoad(outputDirectory);
-    Object instance = fixture.newInstance();
+    try (RuntimeFixture fixture = instrumentAndLoad(outputDirectory)) {
+      Object instance = fixture.newInstance();
 
-    Object result = invoke(instance, "primitiveReturn", int.class, 41);
+      Object result = invoke(instance, "primitiveReturn", int.class, 41);
 
-    assertEquals(42, result);
-    assertEquals(1, snapshot(fixture.timers(), "primitiveReturn").count());
+      assertEquals(42, result);
+      assertEquals(1, snapshot(fixture.timers(), "primitiveReturn").count());
+    }
   }
 
   @Test
   void objectReturnRecordsOnceAndPreservesReturnValue(@TempDir Path outputDirectory)
       throws Exception {
-    RuntimeFixture fixture = instrumentAndLoad(outputDirectory);
-    Object instance = fixture.newInstance();
+    try (RuntimeFixture fixture = instrumentAndLoad(outputDirectory)) {
+      Object instance = fixture.newInstance();
 
-    Object result = invoke(instance, "objectReturn", String.class, "value");
+      Object result = invoke(instance, "objectReturn", String.class, "value");
 
-    assertEquals("object:value", result);
-    assertEquals(1, snapshot(fixture.timers(), "objectReturn").count());
+      assertEquals("object:value", result);
+      assertEquals(1, snapshot(fixture.timers(), "objectReturn").count());
+    }
   }
 
   @Test
   void staticTimedMethodRecordsOnce(@TempDir Path outputDirectory) throws Exception {
-    RuntimeFixture fixture = instrumentAndLoad(outputDirectory);
+    try (RuntimeFixture fixture = instrumentAndLoad(outputDirectory)) {
 
-    Object result = invokeStatic(fixture.sampleClass(), "staticPrimitive", int.class, 21);
+      Object result = invokeStatic(fixture.sampleClass(), "staticPrimitive", int.class, 21);
 
-    assertEquals(42, result);
-    assertEquals(1, snapshot(fixture.timers(), "staticPrimitive").count());
+      assertEquals(42, result);
+      assertEquals(1, snapshot(fixture.timers(), "staticPrimitive").count());
+    }
   }
 
   @Test
   void multipleReturnPathsRecordOncePerSuccessfulExit(@TempDir Path outputDirectory)
       throws Exception {
-    RuntimeFixture fixture = instrumentAndLoad(outputDirectory);
-    Object instance = fixture.newInstance();
+    try (RuntimeFixture fixture = instrumentAndLoad(outputDirectory)) {
+      Object instance = fixture.newInstance();
 
-    assertEquals(-1, invoke(instance, "multipleReturnPaths", int.class, -5));
-    assertEquals(0, invoke(instance, "multipleReturnPaths", int.class, 0));
-    assertEquals(1, invoke(instance, "multipleReturnPaths", int.class, 5));
+      assertEquals(-1, invoke(instance, "multipleReturnPaths", int.class, -5));
+      assertEquals(0, invoke(instance, "multipleReturnPaths", int.class, 0));
+      assertEquals(1, invoke(instance, "multipleReturnPaths", int.class, 5));
 
-    assertEquals(3, snapshot(fixture.timers(), "multipleReturnPaths").count());
+      assertEquals(3, snapshot(fixture.timers(), "multipleReturnPaths").count());
+    }
   }
 
   @Test
   void nestedBranchingRecordsOncePerSuccessfulPath(@TempDir Path outputDirectory) throws Exception {
-    RuntimeFixture fixture = instrumentAndLoad(outputDirectory);
-    Object instance = fixture.newInstance();
+    try (RuntimeFixture fixture = instrumentAndLoad(outputDirectory)) {
+      Object instance = fixture.newInstance();
 
-    assertEquals(-100, invoke(instance, "nestedBranching", int.class, -20));
-    assertEquals(-10, invoke(instance, "nestedBranching", int.class, -5));
-    assertEquals(0, invoke(instance, "nestedBranching", int.class, 0));
-    assertEquals(10, invoke(instance, "nestedBranching", int.class, 5));
+      assertEquals(-100, invoke(instance, "nestedBranching", int.class, -20));
+      assertEquals(-10, invoke(instance, "nestedBranching", int.class, -5));
+      assertEquals(0, invoke(instance, "nestedBranching", int.class, 0));
+      assertEquals(10, invoke(instance, "nestedBranching", int.class, 5));
 
-    assertEquals(4, snapshot(fixture.timers(), "nestedBranching").count());
-    assertEquals(113, fieldValue(instance, "sideEffect"));
+      assertEquals(4, snapshot(fixture.timers(), "nestedBranching").count());
+      assertEquals(113, fieldValue(instance, "sideEffect"));
+    }
   }
 
   @Test
   void switchStatementRecordsOnceAndPreservesReturnValue(@TempDir Path outputDirectory)
       throws Exception {
-    RuntimeFixture fixture = instrumentAndLoad(outputDirectory);
-    Object instance = fixture.newInstance();
+    try (RuntimeFixture fixture = instrumentAndLoad(outputDirectory)) {
+      Object instance = fixture.newInstance();
 
-    assertEquals("zero", invoke(instance, "switchStatement", int.class, 0));
-    assertEquals("small", invoke(instance, "switchStatement", int.class, 2));
-    assertEquals("large", invoke(instance, "switchStatement", int.class, 10));
+      assertEquals("zero", invoke(instance, "switchStatement", int.class, 0));
+      assertEquals("small", invoke(instance, "switchStatement", int.class, 2));
+      assertEquals("large", invoke(instance, "switchStatement", int.class, 10));
 
-    assertEquals(3, snapshot(fixture.timers(), "switchStatement").count());
+      assertEquals(3, snapshot(fixture.timers(), "switchStatement").count());
+    }
   }
 
   @Test
   void loopWithEarlyReturnRecordsOncePerSuccessfulPath(@TempDir Path outputDirectory)
       throws Exception {
-    RuntimeFixture fixture = instrumentAndLoad(outputDirectory);
-    Object instance = fixture.newInstance();
+    try (RuntimeFixture fixture = instrumentAndLoad(outputDirectory)) {
+      Object instance = fixture.newInstance();
 
-    assertEquals(-1, invoke(instance, "loopWithEarlyReturn", int.class, 2));
-    assertEquals(2, invoke(instance, "loopWithEarlyReturn", int.class, 5));
+      assertEquals(-1, invoke(instance, "loopWithEarlyReturn", int.class, 2));
+      assertEquals(2, invoke(instance, "loopWithEarlyReturn", int.class, 5));
 
-    assertEquals(2, snapshot(fixture.timers(), "loopWithEarlyReturn").count());
-    assertEquals(5, fieldValue(instance, "sideEffect"));
+      assertEquals(2, snapshot(fixture.timers(), "loopWithEarlyReturn").count());
+      assertEquals(5, fieldValue(instance, "sideEffect"));
+    }
   }
 
   @Test
   void tryCatchReturningFromCatchRecordsSuccessfulCatchReturn(@TempDir Path outputDirectory)
       throws Exception {
-    RuntimeFixture fixture = instrumentAndLoad(outputDirectory);
-    Object instance = fixture.newInstance();
+    try (RuntimeFixture fixture = instrumentAndLoad(outputDirectory)) {
+      Object instance = fixture.newInstance();
 
-    assertEquals(10, invoke(instance, "tryCatchReturningFromCatch", boolean.class, false));
-    assertEquals(20, invoke(instance, "tryCatchReturningFromCatch", boolean.class, true));
+      assertEquals(10, invoke(instance, "tryCatchReturningFromCatch", boolean.class, false));
+      assertEquals(20, invoke(instance, "tryCatchReturningFromCatch", boolean.class, true));
 
-    assertEquals(2, snapshot(fixture.timers(), "tryCatchReturningFromCatch").count());
-    assertEquals(3, fieldValue(instance, "sideEffect"));
+      assertEquals(2, snapshot(fixture.timers(), "tryCatchReturningFromCatch").count());
+      assertEquals(3, fieldValue(instance, "sideEffect"));
+    }
   }
 
   @Test
   void tryFinallyReturningNormallyRecordsAfterFinallySideEffects(@TempDir Path outputDirectory)
       throws Exception {
-    RuntimeFixture fixture = instrumentAndLoad(outputDirectory);
-    Object instance = fixture.newInstance();
+    try (RuntimeFixture fixture = instrumentAndLoad(outputDirectory)) {
+      Object instance = fixture.newInstance();
 
-    assertEquals(42, invoke(instance, "tryFinallyReturningNormally", int.class, 41));
+      assertEquals(42, invoke(instance, "tryFinallyReturningNormally", int.class, 41));
 
-    assertEquals(1, snapshot(fixture.timers(), "tryFinallyReturningNormally").count());
-    assertEquals(4, fieldValue(instance, "sideEffect"));
+      assertEquals(1, snapshot(fixture.timers(), "tryFinallyReturningNormally").count());
+      assertEquals(4, fieldValue(instance, "sideEffect"));
+    }
   }
 
   @Test
   void throwingMethodDoesNotRecordLatency(@TempDir Path outputDirectory) throws Exception {
-    RuntimeFixture fixture = instrumentAndLoad(outputDirectory);
-    Object instance = fixture.newInstance();
+    try (RuntimeFixture fixture = instrumentAndLoad(outputDirectory)) {
+      Object instance = fixture.newInstance();
 
-    InvocationTargetException exception =
-        assertThrows(InvocationTargetException.class, () -> invoke(instance, "throwingMethod"));
+      InvocationTargetException exception =
+          assertThrows(InvocationTargetException.class, () -> invoke(instance, "throwingMethod"));
 
-    assertTrue(exception.getCause() instanceof IllegalStateException);
-    assertEquals(0, snapshot(fixture.timers(), "throwingMethod").count());
+      assertTrue(exception.getCause() instanceof IllegalStateException);
+      assertEquals(0, snapshot(fixture.timers(), "throwingMethod").count());
+    }
   }
 
   @Test
   void exceptionsBeforeReturnAndInsideCatchDoNotRecordLatency(@TempDir Path outputDirectory)
       throws Exception {
-    RuntimeFixture fixture = instrumentAndLoad(outputDirectory);
-    Object instance = fixture.newInstance();
+    try (RuntimeFixture fixture = instrumentAndLoad(outputDirectory)) {
+      Object instance = fixture.newInstance();
 
-    InvocationTargetException beforeReturn =
-        assertThrows(
-            InvocationTargetException.class, () -> invoke(instance, "exceptionThrownBeforeReturn"));
-    InvocationTargetException insideCatch =
-        assertThrows(
-            InvocationTargetException.class, () -> invoke(instance, "exceptionThrownInsideCatch"));
+      InvocationTargetException beforeReturn =
+          assertThrows(
+              InvocationTargetException.class,
+              () -> invoke(instance, "exceptionThrownBeforeReturn"));
+      InvocationTargetException insideCatch =
+          assertThrows(
+              InvocationTargetException.class,
+              () -> invoke(instance, "exceptionThrownInsideCatch"));
 
-    assertTrue(beforeReturn.getCause() instanceof IllegalStateException);
-    assertEquals("before return", beforeReturn.getCause().getMessage());
-    assertTrue(insideCatch.getCause() instanceof IllegalStateException);
-    assertTrue(insideCatch.getCause().getCause() instanceof IllegalArgumentException);
-    assertEquals(0, snapshot(fixture.timers(), "exceptionThrownBeforeReturn").count());
-    assertEquals(0, snapshot(fixture.timers(), "exceptionThrownInsideCatch").count());
-    assertEquals(11, fieldValue(instance, "sideEffect"));
+      assertTrue(beforeReturn.getCause() instanceof IllegalStateException);
+      assertEquals("before return", beforeReturn.getCause().getMessage());
+      assertTrue(insideCatch.getCause() instanceof IllegalStateException);
+      assertTrue(insideCatch.getCause().getCause() instanceof IllegalArgumentException);
+      assertEquals(0, snapshot(fixture.timers(), "exceptionThrownBeforeReturn").count());
+      assertEquals(0, snapshot(fixture.timers(), "exceptionThrownInsideCatch").count());
+      assertEquals(11, fieldValue(instance, "sideEffect"));
+    }
   }
 
   @Test
   void privateFinalAndSynchronizedTimedMethodsRecord(@TempDir Path outputDirectory)
       throws Exception {
-    RuntimeFixture fixture = instrumentAndLoad(outputDirectory);
-    Object instance = fixture.newInstance();
+    try (RuntimeFixture fixture = instrumentAndLoad(outputDirectory)) {
+      Object instance = fixture.newInstance();
 
-    assertEquals(12, invoke(instance, "callPrivateTimedMethod", int.class, 5));
-    assertEquals(13, invoke(instance, "finalTimedMethod", int.class, 5));
-    assertEquals(14, invoke(instance, "synchronizedTimedMethod", int.class, 5));
+      assertEquals(12, invoke(instance, "callPrivateTimedMethod", int.class, 5));
+      assertEquals(13, invoke(instance, "finalTimedMethod", int.class, 5));
+      assertEquals(14, invoke(instance, "synchronizedTimedMethod", int.class, 5));
 
-    assertEquals(1, snapshot(fixture.timers(), "privateTimedMethod").count());
-    assertEquals(1, snapshot(fixture.timers(), "finalTimedMethod").count());
-    assertEquals(1, snapshot(fixture.timers(), "synchronizedTimedMethod").count());
-    assertEquals(16, fieldValue(instance, "sideEffect"));
+      assertEquals(1, snapshot(fixture.timers(), "privateTimedMethod").count());
+      assertEquals(1, snapshot(fixture.timers(), "finalTimedMethod").count());
+      assertEquals(1, snapshot(fixture.timers(), "synchronizedTimedMethod").count());
+      assertEquals(16, fieldValue(instance, "sideEffect"));
+    }
   }
 
   @Test
   void nonAnnotatedMethodIsUnchangedAndUnregistered(@TempDir Path outputDirectory)
       throws Exception {
-    RuntimeFixture fixture = instrumentAndLoad(outputDirectory);
-    Object instance = fixture.newInstance();
+    try (RuntimeFixture fixture = instrumentAndLoad(outputDirectory)) {
+      Object instance = fixture.newInstance();
 
-    invoke(instance, "normalMethod");
+      invoke(instance, "normalMethod");
 
-    assertEquals(10, fieldValue(instance, "sideEffect"));
-    assertTrue(
-        fixture.timers().snapshots().stream()
-            .noneMatch(snapshot -> snapshot.id().equals(SAMPLE_CLASS_NAME + ".normalMethod")));
+      assertEquals(10, fieldValue(instance, "sideEffect"));
+      assertTrue(
+          fixture.timers().snapshots().stream()
+              .noneMatch(snapshot -> snapshot.id().equals(SAMPLE_CLASS_NAME + ".normalMethod")));
+    }
   }
 
   @Test
   void overloadedTimedMethodsRecordSeparateTimers(@TempDir Path outputDirectory) throws Exception {
-    RuntimeFixture fixture = instrumentAndLoad(outputDirectory);
-    Object instance = fixture.newInstance();
+    try (RuntimeFixture fixture = instrumentAndLoad(outputDirectory)) {
+      Object instance = fixture.newInstance();
 
-    assertEquals(15, invoke(instance, "overloaded", int.class, 5));
-    assertEquals("overloaded:value", invoke(instance, "overloaded", String.class, "value"));
+      assertEquals(15, invoke(instance, "overloaded", int.class, 5));
+      assertEquals("overloaded:value", invoke(instance, "overloaded", String.class, "value"));
 
-    assertEquals(1, snapshot(fixture.timers(), "overloaded.int").count());
-    assertEquals(1, snapshot(fixture.timers(), "overloaded.java.lang.String").count());
+      assertEquals(1, snapshot(fixture.timers(), "overloaded.int").count());
+      assertEquals(1, snapshot(fixture.timers(), "overloaded.java.lang.String").count());
+    }
   }
 
   @Test
@@ -236,12 +253,13 @@ class LatencyInstrumentationBehaviorTest {
     assertEquals(0, second.injectionResult().instrumentedMethods());
     assertEquals(18, second.injectionResult().skippedInstrumentedMethods());
 
-    RuntimeFixture fixture = load(outputDirectory);
-    Object instance = fixture.newInstance();
+    try (RuntimeFixture fixture = load(outputDirectory)) {
+      Object instance = fixture.newInstance();
 
-    invoke(instance, "successfulVoid");
+      invoke(instance, "successfulVoid");
 
-    assertEquals(1, snapshot(fixture.timers(), "successfulVoid").count());
+      assertEquals(1, snapshot(fixture.timers(), "successfulVoid").count());
+    }
   }
 
   private static RuntimeFixture instrumentAndLoad(Path outputDirectory) throws Exception {
@@ -269,7 +287,7 @@ class LatencyInstrumentationBehaviorTest {
     ClassLoader previousClassLoader = currentThread.getContextClassLoader();
     currentThread.setContextClassLoader(classLoader);
     try {
-      Timers timers = new InMemoryTimers();
+      Timers timers = InMemoryTimers.create();
       LatencyClocked latencyClocked = LatencyClocked.initialise(timers);
       Class<?> sampleClass = Class.forName(SAMPLE_CLASS_NAME, true, classLoader);
       return new RuntimeFixture(classLoader, sampleClass, timers, latencyClocked);

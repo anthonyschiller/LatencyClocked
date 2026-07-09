@@ -2,22 +2,56 @@
 
 LatencyClocked is split into small Maven modules:
 
-- `annotations`: public annotations such as `@Timed`.
-- `constants`: shared generated descriptor and bytecode member names, compiled to Java 21.
-- `core`: minimal timer, timer catalogue, snapshot, and startup registration APIs.
-- `hdr`: placeholder for future HDR histogram-backed storage.
+- `model`: shared timer APIs, snapshot values, and generated descriptor/bytecode constants,
+  compiled to Java 21 for Maven plugin compatibility.
+- `hdr`: HDR Histogram backed timer implementation.
+- `core`: startup registration API and runtime handle, using HDR timers by default.
 - `maven-plugin`: build-time descriptor generation and timer field injection.
 - `jmh`: placeholder for future benchmarks.
 
-The core module is dependency-light and currently uses an in-memory timer implementation.
-`Timers` is the central owner and catalogue for all application timers. `timer(id)` returns
-the existing timer for an id or creates and registers one if it does not already exist.
-`snapshots()` returns immutable snapshot values for the registered timers.
+The `model` module contains shared API contracts under `com.ll.metrics.latency.timer`,
+snapshot records under `com.ll.metrics.latency.snapshot`, `@Timed` under
+`com.ll.metrics.latency.annotations`, and generated name constants under
+`com.ll.metrics.latency.constants`. `Timers` is the central owner and catalogue for all
+application timers. `timer(id)` returns the existing timer for an id or creates and
+registers one if it does not already exist. `snapshots()` returns immutable snapshot values
+for the registered timers, including count, min, max, mean, p50, p90, p95, p99, and p999.
+
+Package ownership is intentionally narrow:
+
+| Package | Module | Purpose |
+| --- | --- | --- |
+| `com.ll.metrics.latency.annotations` | `model` | Public source annotations such as `@Timed`. |
+| `com.ll.metrics.latency.constants` | `model` | Shared descriptor paths and generated member names. |
+| `com.ll.metrics.latency.snapshot` | `model` | Immutable latency snapshot records. |
+| `com.ll.metrics.latency.timer` | `model` | Public timer contracts and lightweight in-memory support implementation. |
+| `com.ll.metrics.latency.hdr` | `hdr` | HDR Histogram backed production timer implementation. |
+| `com.ll.metrics.latency.core` | `core` | Runtime startup and generated timer binding. |
+| `com.ll.metrics.latency.maven` | `maven-plugin` | Maven goal orchestration and instrumentation reporting. |
+| `com.ll.metrics.latency.maven.asm` | `maven-plugin` | ASM-specific scanning and bytecode rewriting. |
+| `com.ll.metrics.latency.maven.model` | `maven-plugin` | Build-time metadata records used by the plugin. |
+
+The `hdr` module provides two HDR-backed timer variants. `HdrTimers.create()` creates
+`HdrTimer` instances backed by a regular HDR Histogram for lower-overhead single-writer
+recording. `HdrTimers.createWithThreadsafeTimers()` creates `ThreadSafeHdrTimer` instances
+backed by HDR Histogram's `ConcurrentHistogram` for concurrent recording. Core APIs remain
+histogram-agnostic: neither `Timer`, `Timers`, `LatencySnapshot`, nor `TimerSnapshot` expose
+HDR Histogram types.
+
+`LatencyClocked` is HDR-first. Production startup should normally call
+`LatencyClocked.initialise()` for single-writer timers or
+`LatencyClocked.initialisedThreadSafe()` when timers may be recorded by multiple threads.
+Both create an HDR-backed timer catalogue internally and then bind generated fields. HDR is
+the default because latency telemetry needs percentile snapshots and bounded memory usage;
+each timer keeps a compact histogram rather than retaining every observed duration.
+`LatencyClocked.initialise(timers)` remains available for tests and custom timer catalogues.
+The in-memory timer implementation in `model` is retained as a lightweight support/testing
+implementation rather than the production default.
 
 Startup timer registration is descriptor-based. Classpath modules may publish files named
-`META-INF/latency-clocked/index`; `LatencyClocked.initialise(timers)` loads all matching
-resources from the context classloader and returns a `LatencyClocked` runtime handle. Each
-active line has this format:
+`META-INF/latency-clocked/index`; `LatencyClocked.initialise()` or
+`LatencyClocked.initialise(timers)` loads all matching resources from the context classloader
+and returns a `LatencyClocked` runtime handle. Each active line has this format:
 
 ```text
 <fully.qualified.ClassName>
@@ -31,10 +65,9 @@ For each class entry, core loads the class, finds generated static method
 `latencyClocked.timer(id)`.
 
 Startup binding can be disabled with system property `latency-clocked.enabled=false`.
-When disabled, `LatencyClocked.initialise(timers)` does not read descriptor resources or
-invoke generated bind methods; it only returns the runtime handle and logs that binding is
-disabled. This is an operational escape hatch for disabling generated timing without
-changing the application classpath.
+When disabled, startup does not read descriptor resources or invoke generated bind methods;
+it only returns the runtime handle and logs that binding is disabled. This is an operational
+escape hatch for disabling generated timing without changing the application classpath.
 
 In multi-module applications, each module may contribute its own `META-INF/latency-clocked/index`
 resource. Runtime startup loads all matching resources from the classpath and wires all
@@ -74,7 +107,7 @@ exception, latency is intentionally not recorded.
 
 Instrumentation preserves the original method contract and adds no wrapper stack frames,
 runtime proxies, delegate objects, or hot-path reflection. Reflection remains limited to
-startup binding through `LatencyClocked.initialise(timers)`.
+startup binding through `LatencyClocked.initialise()` and `LatencyClocked.initialise(timers)`.
 
 Runtime startup logging uses SLF4J. The core module depends only on `slf4j-api`; applications
 choose the binding. For production deployments that want asynchronous logging, use Log4j2's
@@ -86,7 +119,7 @@ constructors, class initialisers, native methods, abstract methods, and default 
 methods. Diagnostics include class name, method name, method descriptor, and the unsupported
 reason. Synthetic and bridge methods are skipped.
 
-The `constants` and Maven plugin modules intentionally compile to Java 21 bytecode even
-though the rest of the project targets Java 25. Maven Plugin Tools currently cannot
-process Java 25 plugin class files while generating plugin descriptors, so shared
-constants used by the plugin must live in the Java 21-compatible `constants` module.
+The `model` and Maven plugin modules intentionally compile to Java 21 bytecode even though
+the rest of the project targets Java 25. Maven Plugin Tools currently cannot process Java 25
+plugin class files while generating plugin descriptors, so shared API/constants used by the
+plugin must live in the Java 21-compatible `model` module.

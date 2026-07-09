@@ -1,6 +1,9 @@
 package com.ll.metrics.latency.core;
 
 import com.ll.metrics.latency.constants.LatencyClockedConstants;
+import com.ll.metrics.latency.hdr.HdrTimers;
+import com.ll.metrics.latency.timer.Timer;
+import com.ll.metrics.latency.timer.Timers;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -28,8 +31,20 @@ public final class LatencyClocked {
   }
 
   /**
+   * Initializes generated timer fields using the single-writer HDR-backed timer catalogue.
+   *
+   * <p>Use {@link #initialisedThreadSafe()} when timers may be recorded by multiple threads.
+   * Use {@link #initialise(Timers)} for tests or custom timer catalogues.
+   */
+  public static LatencyClocked initialise() {
+    return initialise(HdrTimers.create());
+  }
+
+  /**
    * Initializes generated timer fields from every latency descriptor resource visible to the
    * context class loader and returns a runtime handle backed by the supplied timers.
+   *
+   * <p>This overload is intended for tests and custom timer implementations.
    */
   public static LatencyClocked initialise(Timers timers) {
     LatencyClocked latencyClocked = new LatencyClocked(timers);
@@ -70,6 +85,16 @@ public final class LatencyClocked {
               + LatencyClockedConstants.DESCRIPTOR_RESOURCE,
           e);
     }
+  }
+
+  /**
+   * Initializes generated timer fields using the thread-safe HDR-backed timer catalogue.
+   *
+   * <p>Production applications with concurrent request handling should prefer this method.
+   * Use {@link #initialise()} for single-writer timers.
+   */
+  public static LatencyClocked initialisedThreadSafe() {
+    return initialise(HdrTimers.createWithThreadsafeTimers());
   }
 
   /** Returns or creates a timer from the initialized timer catalogue. */

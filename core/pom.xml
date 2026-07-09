@@ -15,7 +15,12 @@
     <dependencies>
         <dependency>
             <groupId>com.ll.metrics</groupId>
-            <artifactId>latency-clocked-constants</artifactId>
+            <artifactId>latency-clocked-model</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.ll.metrics</groupId>
+            <artifactId>latency-clocked-hdr</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>

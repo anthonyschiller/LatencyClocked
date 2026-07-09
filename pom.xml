@@ -10,10 +10,9 @@
     <packaging>pom</packaging>
 
     <modules>
-        <module>annotations</module>
-        <module>constants</module>
-        <module>core</module>
+        <module>model</module>
         <module>hdr</module>
+        <module>core</module>
         <module>maven-plugin</module>
         <module>jmh</module>
     </modules>
@@ -23,11 +22,15 @@
         <checkstyle.version>3.6.0</checkstyle.version>
         <maven.compiler.release>25</maven.compiler.release>
         <jacoco.version>0.8.14</jacoco.version>
+        <hdrhistogram.version>2.2.2</hdrhistogram.version>
         <junit.jupiter.version>5.10.3</junit.jupiter.version>
         <log4j2.version>2.25.1</log4j2.version>
+        <japicmp.version>0.23.1</japicmp.version>
+        <maven.invoker.version>3.9.1</maven.invoker.version>
         <maven.surefire.version>3.5.6</maven.surefire.version>
         <slf4j.version>2.0.17</slf4j.version>
         <spotbugs.version>4.10.2.0</spotbugs.version>
+        <versions.maven.plugin.version>2.18.0</versions.maven.plugin.version>
     </properties>
 
     <dependencyManagement>
@@ -36,6 +39,11 @@
                 <groupId>org.slf4j</groupId>
                 <artifactId>slf4j-api</artifactId>
                 <version>${slf4j.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.hdrhistogram</groupId>
+                <artifactId>HdrHistogram</artifactId>
+                <version>${hdrhistogram.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.logging.log4j</groupId>
@@ -103,8 +111,8 @@
                 <artifactId>maven-dependency-plugin</artifactId>
                 <version>3.11.0</version>
                 <executions>
-            <execution>
-                <id>analyze-dependencies</id>
+                    <execution>
+                        <id>analyze-dependencies</id>
                         <phase>verify</phase>
                         <goals>
                             <goal>analyze-only</goal>
@@ -246,4 +254,78 @@
             </plugins>
         </pluginManagement>
     </build>
+
+    <profiles>
+        <profile>
+            <id>dependency-updates</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>versions-maven-plugin</artifactId>
+                        <version>${versions.maven.plugin.version}</version>
+                        <executions>
+                            <execution>
+                                <id>dependency-updates</id>
+                                <phase>validate</phase>
+                                <goals>
+                                    <goal>display-dependency-updates</goal>
+                                    <goal>display-plugin-updates</goal>
+                                    <goal>display-property-updates</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>api-compat</id>
+            <properties>
+                <api.previous.version>1.0-SNAPSHOT</api.previous.version>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.github.siom79.japicmp</groupId>
+                        <artifactId>japicmp-maven-plugin</artifactId>
+                        <version>${japicmp.version}</version>
+                        <configuration>
+                            <oldVersion>
+                                <dependency>
+                                    <groupId>${project.groupId}</groupId>
+                                    <artifactId>${project.artifactId}</artifactId>
+                                    <version>${api.previous.version}</version>
+                                </dependency>
+                            </oldVersion>
+                            <newVersion>
+                                <file>
+                                    <path>${project.build.directory}/${project.build.finalName}.jar</path>
+                                </file>
+                            </newVersion>
+                            <parameter>
+                                <breakBuildOnBinaryIncompatibleModifications>
+                                    true
+                                </breakBuildOnBinaryIncompatibleModifications>
+                                <breakBuildOnSourceIncompatibleModifications>
+                                    true
+                                </breakBuildOnSourceIncompatibleModifications>
+                                <onlyModified>true</onlyModified>
+                            </parameter>
+                            <skipPomModules>true</skipPomModules>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>api-compatibility</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>cmp</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

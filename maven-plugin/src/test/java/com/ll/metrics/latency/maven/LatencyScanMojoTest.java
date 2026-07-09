@@ -5,8 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.ll.metrics.latency.constants.LatencyClockedConstants;
-import com.ll.metrics.latency.core.Timer;
 import com.ll.metrics.latency.maven.samples.SampleTimedClass;
+import com.ll.metrics.latency.timer.Timer;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;

@@ -21,14 +21,8 @@
     <dependencies>
         <dependency>
             <groupId>com.ll.metrics</groupId>
-            <artifactId>latency-clocked-constants</artifactId>
+            <artifactId>latency-clocked-model</artifactId>
             <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.ll.metrics</groupId>
-            <artifactId>latency-clocked-annotations</artifactId>
-            <version>${project.version}</version>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.ll.metrics</groupId>
@@ -94,4 +88,46 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>plugin-it</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-invoker-plugin</artifactId>
+                        <version>${maven.invoker.version}</version>
+                        <configuration>
+                            <cloneProjectsTo>${project.build.directory}/it</cloneProjectsTo>
+                            <localRepositoryPath>
+                                ${project.build.directory}/it-local-repository
+                            </localRepositoryPath>
+                            <pomIncludes>
+                                <pomInclude>*/pom.xml</pomInclude>
+                            </pomIncludes>
+                            <projectsDirectory>src/it</projectsDirectory>
+                            <streamLogs>true</streamLogs>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>install-plugin-artifacts</id>
+                                <phase>pre-integration-test</phase>
+                                <goals>
+                                    <goal>install</goal>
+                                </goals>
+                            </execution>
+                            <execution>
+                                <id>run-plugin-integration-tests</id>
+                                <phase>integration-test</phase>
+                                <goals>
+                                    <goal>run</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>
