@@ -25,7 +25,7 @@ final class BindMethodInjector {
       methodVisitor.visitMethodInsn(
           Opcodes.INVOKEINTERFACE,
           AsmConstants.TIMERS_INTERNAL_NAME,
-          "timer",
+          "claim",
           "(Ljava/lang/String;)" + AsmConstants.TIMER_DESCRIPTOR,
           true);
       methodVisitor.visitFieldInsn(

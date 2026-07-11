@@ -12,21 +12,21 @@ import org.junit.jupiter.api.Test;
 
 class InMemoryTimersTest {
   @Test
-  void returnsSameTimerForSameId() {
+  void returnsSameTimerForSameMethodId() {
     Timers timers = InMemoryTimers.create();
 
-    Timer first = timers.timer("service.call");
-    Timer second = timers.timer("service.call");
+    Timer first = timers.claim("service.call");
+    Timer second = timers.claim("service.call");
 
     assertSame(first, second);
   }
 
   @Test
-  void returnsDifferentTimersForDifferentIds() {
+  void returnsDifferentTimersForDifferentMethodIds() {
     Timers timers = InMemoryTimers.create();
 
-    Timer first = timers.timer("service.first");
-    Timer second = timers.timer("service.second");
+    Timer first = timers.claim("service.first");
+    Timer second = timers.claim("service.second");
 
     assertNotSame(first, second);
   }
@@ -35,22 +35,22 @@ class InMemoryTimersTest {
   void rejectsNullId() {
     Timers timers = InMemoryTimers.create();
 
-    assertThrows(NullPointerException.class, () -> timers.timer(null));
+    assertThrows(NullPointerException.class, () -> timers.claim(null));
   }
 
   @Test
   void rejectsBlankId() {
     Timers timers = InMemoryTimers.create();
 
-    assertThrows(IllegalArgumentException.class, () -> timers.timer(""));
-    assertThrows(IllegalArgumentException.class, () -> timers.timer("  "));
+    assertThrows(IllegalArgumentException.class, () -> timers.claim(""));
+    assertThrows(IllegalArgumentException.class, () -> timers.claim("  "));
   }
 
   @Test
   void snapshotsIncludeRegisteredTimerIds() {
     Timers timers = InMemoryTimers.create();
-    timers.timer("service.first");
-    timers.timer("service.second");
+    timers.claim("service.first");
+    timers.claim("service.second");
 
     Collection<TimerSnapshot> snapshots = timers.snapshots();
 
@@ -62,8 +62,8 @@ class InMemoryTimersTest {
   @Test
   void snapshotsReflectRecordedValues() {
     Timers timers = InMemoryTimers.create();
-    timers.timer("service.call").record(10);
-    timers.timer("service.call").record(20);
+    timers.claim("service.call").record(10);
+    timers.claim("service.call").record(20);
 
     TimerSnapshot snapshot =
         timers.snapshots().stream()
@@ -85,7 +85,7 @@ class InMemoryTimersTest {
   @Test
   void snapshotsReturnsImmutableCollection() {
     Timers timers = InMemoryTimers.create();
-    timers.timer("service.call");
+    timers.claim("service.call");
 
     Collection<TimerSnapshot> snapshots = timers.snapshots();
 

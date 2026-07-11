@@ -50,6 +50,8 @@ Startup lifecycle cases:
   `IllegalStateException` when LatencyClocked is enabled.
 - Calling an instrumented method while `latency-clocked.enabled=false` bypasses generated
   timing code.
+- A method timer represents only complete successful executions of one `@Timed` method.
+  `@Timed` is intentionally a marker annotation, so timer ownership is always method-scoped.
 
 Build idempotency cases:
 

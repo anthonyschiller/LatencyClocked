@@ -298,22 +298,22 @@ public class LatencyClockedBenchmark {
     private int value = 41;
     private final Object object = new Object();
 
-    @Timed("benchmark.latency-clocked.void")
+    @Timed
     void voidCall() {
       value++;
     }
 
-    @Timed("benchmark.latency-clocked.primitive")
+    @Timed
     int primitiveReturn() {
       return value + 1;
     }
 
-    @Timed("benchmark.latency-clocked.object")
+    @Timed
     Object objectReturn() {
       return object;
     }
 
-    @Timed("benchmark.latency-clocked.static")
+    @Timed
     static void staticCall() {
       Blackhole.consumeCPU(1);
     }
@@ -323,22 +323,22 @@ public class LatencyClockedBenchmark {
     private int value = 41;
     private final Object object = new Object();
 
-    @Timed("benchmark.latency-clocked.disabled.void")
+    @Timed
     void voidCall() {
       value++;
     }
 
-    @Timed("benchmark.latency-clocked.disabled.primitive")
+    @Timed
     int primitiveReturn() {
       return value + 1;
     }
 
-    @Timed("benchmark.latency-clocked.disabled.object")
+    @Timed
     Object objectReturn() {
       return object;
     }
 
-    @Timed("benchmark.latency-clocked.disabled.static")
+    @Timed
     static void staticCall() {
       Blackhole.consumeCPU(1);
     }

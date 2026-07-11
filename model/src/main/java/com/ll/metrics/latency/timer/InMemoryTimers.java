@@ -7,7 +7,7 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-/** In-memory timer catalogue that creates timers on first use. */
+/** In-memory generated method timer catalogue that creates timers on first bind. */
 public final class InMemoryTimers implements Timers {
   private final ConcurrentMap<String, Timer> timers = new ConcurrentHashMap<>();
 
@@ -18,12 +18,12 @@ public final class InMemoryTimers implements Timers {
   private InMemoryTimers() {}
 
   @Override
-  public Timer timer(String id) {
-    Objects.requireNonNull(id, "id");
-    if (id.isBlank()) {
-      throw new IllegalArgumentException("id must not be blank");
+  public Timer claim(String methodId) {
+    Objects.requireNonNull(methodId, "methodId");
+    if (methodId.isBlank()) {
+      throw new IllegalArgumentException("methodId must not be blank");
     }
-    return timers.computeIfAbsent(id, ignored -> new InMemoryTimer());
+    return timers.computeIfAbsent(methodId, ignored -> new InMemoryTimer());
   }
 
   @Override

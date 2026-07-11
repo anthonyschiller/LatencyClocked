@@ -2,11 +2,11 @@ package com.ll.metrics.latency.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.ll.metrics.latency.constants.LatencyClockedConstants;
+import com.ll.metrics.latency.timer.Timer;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.URL;
@@ -43,7 +43,7 @@ class LatencyClockedTest {
 
           static void __latency_clocked$bind(Timers timers) {
             bindInvocations++;
-            firstTimer = timers.timer("service.first");
+            firstTimer = timers.claim("service.first");
           }
         }
         """);
@@ -54,7 +54,10 @@ class LatencyClockedTest {
         () -> {
           LatencyClocked latencyClocked = LatencyClocked.initialise();
           Class<?> target = load("DescriptorTarget");
-          assertSame(latencyClocked.timer("service.first"), fieldValue(target, "firstTimer"));
+          assertNotNull(fieldValue(target, "firstTimer"));
+          assertTrue(
+              latencyClocked.snapshots().stream()
+                  .anyMatch(snapshot -> snapshot.id().equals("service.first")));
           assertEquals(1, fieldValue(target, "bindInvocations"));
         });
   }
@@ -72,12 +75,14 @@ class LatencyClockedTest {
         secondDir,
         () -> {
           LatencyClocked latencyClocked = LatencyClocked.initialise();
-          assertSame(
-              latencyClocked.timer("service.first"),
-              fieldValue(load("FirstDescriptorTarget"), "firstTimer"));
-          assertSame(
-              latencyClocked.timer("service.second"),
-              fieldValue(load("SecondDescriptorTarget"), "secondTimer"));
+          assertNotNull(fieldValue(load("FirstDescriptorTarget"), "firstTimer"));
+          assertNotNull(fieldValue(load("SecondDescriptorTarget"), "secondTimer"));
+          assertTrue(
+              latencyClocked.snapshots().stream()
+                  .anyMatch(snapshot -> snapshot.id().equals("service.first")));
+          assertTrue(
+              latencyClocked.snapshots().stream()
+                  .anyMatch(snapshot -> snapshot.id().equals("service.second")));
         });
   }
 
@@ -94,7 +99,7 @@ class LatencyClockedTest {
           public static int bindInvocations;
 
           static void __latency_clocked$bind(Timers timers) {
-            timers.timer("service.duplicate");
+            timers.claim("service.duplicate");
             bindInvocations++;
           }
         }
@@ -120,9 +125,10 @@ class LatencyClockedTest {
         tempDir,
         () -> {
           LatencyClocked latencyClocked = LatencyClocked.initialise();
-          assertSame(
-              latencyClocked.timer("service.private"),
-              fieldValue(load("DescriptorTarget"), "privateTimer"));
+          assertNotNull(fieldValue(load("DescriptorTarget"), "privateTimer"));
+          assertTrue(
+              latencyClocked.snapshots().stream()
+                  .anyMatch(snapshot -> snapshot.id().equals("service.private")));
         });
   }
 
@@ -182,7 +188,7 @@ class LatencyClockedTest {
 
         public final class NonStaticBindTarget {
           void __latency_clocked$bind(Timers timers) {
-            timers.timer("service.nonstatic");
+            timers.claim("service.nonstatic");
           }
         }
         """);
@@ -245,21 +251,24 @@ class LatencyClockedTest {
         tempDir,
         () -> {
           LatencyClocked latencyClocked = LatencyClocked.initialise();
-          assertNotNull(latencyClocked.timer("manual.timer"));
+          assertTrue(latencyClocked.snapshots().isEmpty());
           assertEquals(0, fieldValue(load("DisabledDescriptorTarget"), "bindInvocations"));
         });
   }
 
   @Test
-  void timerLookupStillUsesActiveTimers(@TempDir Path tempDir) throws Exception {
+  void snapshotsRemainAvailableForBoundTimers(@TempDir Path tempDir) throws Exception {
     compileBindingFixture(tempDir, "DescriptorTarget", "firstTimer", "service.first");
     writeDescriptor(tempDir, "DescriptorTarget");
     LatencyClocked latencyClocked =
         withDescriptorClasspath(tempDir, (ThrowingInitialise) LatencyClocked::initialise);
 
-    assertNotNull(latencyClocked.timer("service.first"));
-    assertSame(
-        latencyClocked.timer("service.first"), fieldValue(load("DescriptorTarget"), "firstTimer"));
+    Timer timer = (Timer) fieldValue(load("DescriptorTarget"), "firstTimer");
+    timer.record(10);
+
+    assertTrue(
+        latencyClocked.snapshots().stream()
+            .anyMatch(snapshot -> snapshot.id().equals("service.first") && snapshot.count() == 1));
   }
 
   @Test
@@ -270,9 +279,10 @@ class LatencyClockedTest {
         withDescriptorClasspath(
             tempDir, (ThrowingInitialise) LatencyClocked::initialisedThreadSafe);
 
-    assertSame(
-        latencyClocked.timer("service.thread.safe"),
-        fieldValue(load("ThreadSafeDescriptorTarget"), "timer"));
+    assertNotNull(fieldValue(load("ThreadSafeDescriptorTarget"), "timer"));
+    assertTrue(
+        latencyClocked.snapshots().stream()
+            .anyMatch(snapshot -> snapshot.id().equals("service.thread.safe")));
   }
 
   private static void compileBindingFixture(
@@ -288,7 +298,7 @@ class LatencyClockedTest {
           public static Timer %s;
 
           static void __latency_clocked$bind(Timers timers) {
-            %s = timers.timer("%s");
+            %s = timers.claim("%s");
           }
         }
         """

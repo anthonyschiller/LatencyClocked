@@ -4,6 +4,7 @@ package com.ll.metrics.latency.constants;
 public final class LatencyClockedConstants {
   public static final String RESOURCE_PATH_SEPARATOR = "/";
   public static final String CLASS_NAME_SEPARATOR = ".";
+  public static final String METHOD_ID_SEPARATOR = "#";
   public static final String CLASS_FILE_EXTENSION = ".class";
   public static final String DESCRIPTOR_ROOT = "META-INF";
   public static final String DESCRIPTOR_DIRECTORY = "latency-clocked";

@@ -15,8 +15,8 @@ public final class SampleTimedClass {
   @Timed
   public void overloaded(String value) {}
 
-  @Timed("custom.id")
-  public void explicitTimerId() {}
+  @Timed
+  public void timedMethodWithGeneratedId() {}
 
   @Timed
   public static void staticTimedMethod() {}

@@ -2,7 +2,7 @@ package com.ll.metrics.latency.core;
 
 import com.ll.metrics.latency.constants.LatencyClockedConstants;
 import com.ll.metrics.latency.hdr.HdrTimers;
-import com.ll.metrics.latency.timer.Timer;
+import com.ll.metrics.latency.snapshot.TimerSnapshot;
 import com.ll.metrics.latency.timer.Timers;
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -12,6 +12,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.Collection;
 import java.util.Enumeration;
 import java.util.LinkedHashSet;
 import java.util.Objects;
@@ -20,7 +21,7 @@ import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Entry point for startup descriptor loading and timer lookup. */
+/** Entry point for startup descriptor loading and generated timer binding. */
 public final class LatencyClocked {
   private static final Logger LOGGER = LoggerFactory.getLogger(LatencyClocked.class);
   private static volatile boolean enabled = isEnabledPropertySet();
@@ -99,9 +100,9 @@ public final class LatencyClocked {
     return initialise(HdrTimers.createWithThreadsafeTimers());
   }
 
-  /** Returns or creates a timer from the initialized timer catalogue. */
-  public Timer timer(String id) {
-    return timers.timer(id);
+  /** Returns immutable reporting snapshots for generated method timers. */
+  public Collection<TimerSnapshot> snapshots() {
+    return timers.snapshots();
   }
 
   /** Returns whether generated latency recording is currently enabled. */

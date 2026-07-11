@@ -118,7 +118,6 @@ public final class TimedClassAnalyser {
     private final String methodName;
     private final String descriptor;
     private final List<TimedMethodCandidate> timedMethods;
-    private String timerId = "";
 
     private TimedAnnotationVisitor(
         String className,
@@ -137,22 +136,13 @@ public final class TimedClassAnalyser {
     }
 
     @Override
-    public void visit(String name, Object value) {
-      // "value" corresponds to the annotation field in @file:Timed.java.
-      if ("value".equals(name) && value instanceof String stringValue) {
-        timerId = stringValue;
-      }
-    }
-
-    @Override
     public void visitEnd() {
       if (isSyntheticOrBridge(access)) {
         return;
       }
       validateSupportedTimedMethod(className, classAccess, access, methodName, descriptor);
       timedMethods.add(
-          new TimedMethodCandidate(
-              methodName, descriptor, (access & Opcodes.ACC_STATIC) != 0, timerId));
+          new TimedMethodCandidate(methodName, descriptor, (access & Opcodes.ACC_STATIC) != 0));
     }
   }
 

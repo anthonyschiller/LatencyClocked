@@ -10,7 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Supplier;
 
-/** HDR Histogram backed timer catalogue that creates timers on first use. */
+/** HDR Histogram backed generated method timer catalogue that creates timers on first bind. */
 public final class HdrTimers implements Timers {
   private final ConcurrentMap<String, Timer> timers = new ConcurrentHashMap<>();
   private final Supplier<Timer> timerFactory;
@@ -28,12 +28,12 @@ public final class HdrTimers implements Timers {
   }
 
   @Override
-  public Timer timer(String id) {
-    Objects.requireNonNull(id, "id");
-    if (id.isBlank()) {
-      throw new IllegalArgumentException("id must not be blank");
+  public Timer claim(String methodId) {
+    Objects.requireNonNull(methodId, "methodId");
+    if (methodId.isBlank()) {
+      throw new IllegalArgumentException("methodId must not be blank");
     }
-    return timers.computeIfAbsent(id, ignored -> timerFactory.get());
+    return timers.computeIfAbsent(methodId, ignored -> timerFactory.get());
   }
 
   @Override

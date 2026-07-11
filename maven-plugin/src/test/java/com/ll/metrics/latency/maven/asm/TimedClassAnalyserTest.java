@@ -35,7 +35,7 @@ class TimedClassAnalyserTest {
     assertTrue(methodsByName.containsKey("timedMethod"));
     assertFalse(methodsByName.get("timedMethod").isStatic());
     assertEquals(
-        SampleTimedClass.class.getName() + ".timedMethod",
+        SampleTimedClass.class.getName() + "#timedMethod()V",
         methodsByName.get("timedMethod").resolvedTimerId());
   }
 
@@ -45,16 +45,18 @@ class TimedClassAnalyserTest {
     TimedMethodMetadata method = methodsByName(metadata).get("staticTimedMethod");
 
     assertTrue(method.isStatic());
-    assertEquals(SampleTimedClass.class.getName() + ".staticTimedMethod", method.resolvedTimerId());
+    assertEquals(
+        SampleTimedClass.class.getName() + "#staticTimedMethod()V", method.resolvedTimerId());
   }
 
   @Test
-  void capturesExplicitTimedValue() throws IOException {
+  void resolvesGeneratedMethodId() throws IOException {
     TimedClassMetadata metadata = analyser.analyse(classFile(SampleTimedClass.class));
-    TimedMethodMetadata method = methodsByName(metadata).get("explicitTimerId");
+    TimedMethodMetadata method = methodsByName(metadata).get("timedMethodWithGeneratedId");
 
-    assertEquals("custom.id", method.explicitTimerId());
-    assertEquals("custom.id", method.resolvedTimerId());
+    assertEquals(
+        SampleTimedClass.class.getName() + "#timedMethodWithGeneratedId()V",
+        method.resolvedTimerId());
   }
 
   @Test
@@ -67,7 +69,7 @@ class TimedClassAnalyserTest {
                 method ->
                     method
                         .resolvedTimerId()
-                        .equals(SampleTimedClass.class.getName() + ".overloaded.int")));
+                        .equals(SampleTimedClass.class.getName() + "#overloaded(I)V")));
     assertTrue(
         metadata.timedMethods().stream()
             .anyMatch(
@@ -75,7 +77,8 @@ class TimedClassAnalyserTest {
                     method
                         .resolvedTimerId()
                         .equals(
-                            SampleTimedClass.class.getName() + ".overloaded.java.lang.String")));
+                            SampleTimedClass.class.getName()
+                                + "#overloaded(Ljava/lang/String;)V")));
   }
 
   @Test

@@ -92,7 +92,19 @@ class BenchmarkInstrumentationTest {
 
     target.voidCall();
 
-    assertEquals(1L, timers.timer("benchmark.latency-clocked.void").snapshot().count());
+    assertEquals(
+        1L,
+        timers.snapshots().stream()
+            .filter(
+                snapshot ->
+                    snapshot
+                        .id()
+                        .equals(
+                            LatencyClockedBenchmark.LatencyClockedTarget.class.getName()
+                                + "#voidCall()V"))
+            .findFirst()
+            .orElseThrow()
+            .count());
   }
 
   @Test

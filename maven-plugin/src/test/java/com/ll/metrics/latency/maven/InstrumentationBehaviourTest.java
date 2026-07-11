@@ -8,7 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.ll.metrics.latency.constants.LatencyClockedConstants;
 import com.ll.metrics.latency.core.LatencyClocked;
 import com.ll.metrics.latency.maven.model.LatencyDescriptorEntry;
-import com.ll.metrics.latency.snapshot.LatencySnapshot;
+import com.ll.metrics.latency.snapshot.TimerSnapshot;
 import com.ll.metrics.latency.timer.InMemoryTimers;
 import com.ll.metrics.latency.timer.Timers;
 import java.io.IOException;
@@ -227,7 +227,7 @@ class InstrumentationBehaviourTest {
       assertEquals(10, fieldValue(instance, "sideEffect"));
       assertTrue(
           fixture.timers().snapshots().stream()
-              .noneMatch(snapshot -> snapshot.id().equals(SAMPLE_CLASS_NAME + ".normalMethod")));
+              .noneMatch(snapshot -> snapshot.id().startsWith(methodIdPrefix("normalMethod"))));
     }
   }
 
@@ -239,8 +239,11 @@ class InstrumentationBehaviourTest {
       assertEquals(15, invoke(instance, "overloaded", int.class, 5));
       assertEquals("overloaded:value", invoke(instance, "overloaded", String.class, "value"));
 
-      assertEquals(1, snapshot(fixture.timers(), "overloaded.int").count());
-      assertEquals(1, snapshot(fixture.timers(), "overloaded.java.lang.String").count());
+      assertEquals(1, snapshot(fixture.timers(), "overloaded", "(I)I").count());
+      assertEquals(
+          1,
+          snapshot(fixture.timers(), "overloaded", "(Ljava/lang/String;)Ljava/lang/String;")
+              .count());
     }
   }
 
@@ -422,10 +425,23 @@ class InstrumentationBehaviourTest {
     return field.get(target);
   }
 
-  private static LatencySnapshot snapshot(Timers timers, String timerName) {
-    return timers
-        .timer(SAMPLE_CLASS_NAME + LatencyClockedConstants.CLASS_NAME_SEPARATOR + timerName)
-        .snapshot();
+  private static TimerSnapshot snapshot(Timers timers, String timerName) {
+    return timers.snapshots().stream()
+        .filter(snapshot -> snapshot.id().startsWith(methodIdPrefix(timerName)))
+        .findFirst()
+        .orElseThrow();
+  }
+
+  private static TimerSnapshot snapshot(Timers timers, String methodName, String descriptor) {
+    String id = methodIdPrefix(methodName) + descriptor;
+    return timers.snapshots().stream()
+        .filter(snapshot -> snapshot.id().equals(id))
+        .findFirst()
+        .orElseThrow();
+  }
+
+  private static String methodIdPrefix(String methodName) {
+    return SAMPLE_CLASS_NAME + "#" + methodName;
   }
 
   private static void restoreEnabledProperty(String previousEnabledProperty) {

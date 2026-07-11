@@ -18,7 +18,15 @@ final class MultiModuleRuntimeTest {
     assertEquals(1, new ModuleOneService().one());
     assertEquals(2, ModuleTwoService.two());
 
-    assertEquals(1, timers.timer("it.module.one").snapshot().count());
-    assertEquals(1, timers.timer("it.module.two").snapshot().count());
+    assertEquals(1, count(timers, "com.example.one.ModuleOneService#one()I"));
+    assertEquals(1, count(timers, "com.example.two.ModuleTwoService#two()I"));
+  }
+
+  private static long count(Timers timers, String id) {
+    return timers.snapshots().stream()
+        .filter(snapshot -> snapshot.id().equals(id))
+        .findFirst()
+        .orElseThrow()
+        .count();
   }
 }

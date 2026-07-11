@@ -68,11 +68,11 @@ class LatencyDescriptorGeneratorTest {
     assertEquals(5, sampleEntries.size());
     assertTrue(
         sampleEntries.stream()
-            .noneMatch(entry -> entry.timerId().equals(SAMPLE_CLASS_NAME + ".normalMethod")));
+            .noneMatch(entry -> entry.timerId().startsWith(SAMPLE_CLASS_NAME + "#normalMethod")));
   }
 
   @Test
-  void scanUsesExplicitTimerIdWhenPresent() throws IOException {
+  void scanUsesGeneratedMethodIdForTimedMethods() throws IOException {
     List<LatencyDescriptorEntry> entries =
         entriesIn(LatencyDescriptorGenerator.scan(Path.of("target", "test-classes")));
 
@@ -81,7 +81,9 @@ class LatencyDescriptorGeneratorTest {
             .anyMatch(
                 entry ->
                     entry.className().equals(SAMPLE_CLASS_NAME)
-                        && entry.timerId().equals("custom.id")));
+                        && entry
+                            .timerId()
+                            .equals(SAMPLE_CLASS_NAME + "#timedMethodWithGeneratedId()V")));
   }
 
   @Test
@@ -95,8 +97,8 @@ class LatencyDescriptorGeneratorTest {
             .map(LatencyDescriptorEntry::timerId)
             .collect(Collectors.toSet());
 
-    assertTrue(timerIds.contains(SAMPLE_CLASS_NAME + ".overloaded.int"));
-    assertTrue(timerIds.contains(SAMPLE_CLASS_NAME + ".overloaded.java.lang.String"));
+    assertTrue(timerIds.contains(SAMPLE_CLASS_NAME + "#overloaded(I)V"));
+    assertTrue(timerIds.contains(SAMPLE_CLASS_NAME + "#overloaded(Ljava/lang/String;)V"));
   }
 
   @Test
@@ -109,7 +111,7 @@ class LatencyDescriptorGeneratorTest {
             .anyMatch(
                 entry ->
                     entry.className().equals(SAMPLE_CLASS_NAME)
-                        && entry.timerId().equals(SAMPLE_CLASS_NAME + ".timedMethod")));
+                        && entry.timerId().equals(SAMPLE_CLASS_NAME + "#timedMethod()V")));
   }
 
   @Test
@@ -122,7 +124,7 @@ class LatencyDescriptorGeneratorTest {
             .anyMatch(
                 entry ->
                     entry.className().equals(SAMPLE_CLASS_NAME)
-                        && entry.timerId().equals(SAMPLE_CLASS_NAME + ".staticTimedMethod")));
+                        && entry.timerId().equals(SAMPLE_CLASS_NAME + "#staticTimedMethod()V")));
   }
 
   @Test
@@ -257,7 +259,7 @@ class LatencyDescriptorGeneratorTest {
 
     LatencyDescriptorEntry staticEntry =
         entries.stream()
-            .filter(entry -> entry.timerId().equals(SAMPLE_CLASS_NAME + ".staticTimedMethod"))
+        .filter(entry -> entry.timerId().equals(SAMPLE_CLASS_NAME + "#staticTimedMethod()V"))
             .findFirst()
             .orElseThrow();
     FieldInfo field =
@@ -294,7 +296,7 @@ class LatencyDescriptorGeneratorTest {
 
     Field field = instrumentedClass.getDeclaredField(entry.fieldName());
     field.setAccessible(true);
-    assertEquals(timers.timer(entry.timerId()), field.get(null));
+    assertEquals(timers.claim(entry.timerId()), field.get(null));
   }
 
   @Test

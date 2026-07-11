@@ -4,4 +4,4 @@ assert index.text.contains('com.example.InvokerTimedSample')
 
 def report = new File(basedir, 'target/latency-clocked/instrumentation-report.txt')
 assert report.isFile()
-assert report.text.contains('it.sample')
+assert report.text.contains('com.example.InvokerTimedSample#timed()V')

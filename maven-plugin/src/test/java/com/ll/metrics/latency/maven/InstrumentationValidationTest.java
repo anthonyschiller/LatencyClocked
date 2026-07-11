@@ -82,7 +82,9 @@ class InstrumentationValidationTest {
 
     assertEquals(1, entries.size());
     assertEquals(
-        "golden.GenericBridgeTimedSamples$StringHandler.handle", entries.getFirst().timerId());
+        "golden.GenericBridgeTimedSamples$StringHandler#handle"
+            + "(Ljava/lang/String;)Ljava/lang/String;",
+        entries.getFirst().timerId());
     assertEquals("(Ljava/lang/String;)Ljava/lang/String;", entries.getFirst().methodDescriptor());
   }
 

@@ -16,7 +16,7 @@ Each non-comment line is an instrumented class name:
 <fully.qualified.ClassName>
 ```
 
-`Timers` owns the application's timer catalogue. `LatencyClocked.initialise()` creates the
+`Timers` owns generated method timers. `LatencyClocked.initialise()` creates the
 default single-writer HDR-backed timer catalogue. `LatencyClocked.initialisedThreadSafe()`
 creates the concurrent HDR-backed timer catalogue for multi-threaded applications.
 `LatencyClocked.initialise(timers)` is available for tests and custom timer catalogues.
@@ -24,10 +24,10 @@ Startup loads every index resource from the classpath, loads each class, invokes
 generated `__latency_clocked$bind(Timers)` method once at startup, and returns a
 `LatencyClocked` runtime handle.
 
-Generated bind methods assign fields with embedded timer ids:
+Generated bind methods assign fields with embedded generated method ids:
 
 ```java
-__latency_clocked_timer_0 = timers.timer("some.id");
+__latency_clocked_timer_0 = timers.claim("com.example.Service#call()V");
 ```
 
 Quick start:
@@ -35,21 +35,20 @@ Quick start:
 1. Add `latency-clocked-core` to the application runtime.
 2. Configure `latency-clocked-maven-plugin` in every Maven module that contains `@Timed`
    methods.
-3. Annotate methods with `@Timed` or `@Timed("custom.id")`.
+3. Annotate methods with `@Timed`.
 4. Call `LatencyClocked.initialise()` once during application startup before invoking timed
    methods.
 
-Application code can keep the returned handle for explicit timer lookup:
+Application code can keep the returned handle for reporting snapshots:
 
 ```java
 LatencyClocked latencyClocked = LatencyClocked.initialise();
-Timer timer = latencyClocked.timer("some.id");
+var snapshots = latencyClocked.snapshots();
 ```
 
 Set `-Dlatency-clocked.enabled=false` to disable generated timer binding at startup.
 When disabled, `LatencyClocked.initialise()` skips descriptor loading and logs that
-LatencyClocked is disabled. Explicit timer lookup through the returned handle still uses
-the active `Timers` instance. Instrumented methods bypass generated timing code while
+LatencyClocked is disabled. Instrumented methods bypass generated timing code while
 `LatencyClocked.enabled()` is false.
 
 The Maven plugin provides `latency-clocked:scan`, bound by default to `process-classes`.
@@ -68,6 +67,11 @@ Timed methods call `System.nanoTime()` at method entry and record elapsed nanose
 every normal return path. Exception exits intentionally do not record latency. Timing is
 inserted into the original method body, so instrumentation adds no wrapper stack frames and
 uses no runtime proxies.
+
+A method timer represents only complete successful executions of one `@Timed` method.
+Generated timer fields are private, static, synthetic, and associated with exactly one
+annotated method. `@Timed` is intentionally a marker annotation; generated instrumentation
+binds one canonical timer per generated method id.
 
 Calling an instrumented method while LatencyClocked is enabled but before startup binding
 has run fails fast with an `IllegalStateException` telling the caller to invoke

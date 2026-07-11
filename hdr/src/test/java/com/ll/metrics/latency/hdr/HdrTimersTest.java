@@ -17,7 +17,7 @@ class HdrTimersTest {
   void createsHdrBackedTimers() {
     Timers timers = HdrTimers.create();
 
-    Timer timer = timers.timer("service.call");
+    Timer timer = timers.claim("service.call");
 
     assertInstanceOf(HdrTimers.class, timers);
     assertInstanceOf(HdrTimer.class, timer);
@@ -27,28 +27,28 @@ class HdrTimersTest {
   void createsThreadSafeHdrBackedTimers() {
     Timers timers = HdrTimers.createWithThreadsafeTimers();
 
-    Timer timer = timers.timer("service.call");
+    Timer timer = timers.claim("service.call");
 
     assertInstanceOf(HdrTimers.class, timers);
     assertInstanceOf(ThreadSafeHdrTimer.class, timer);
   }
 
   @Test
-  void returnsSameTimerForSameId() {
+  void returnsSameTimerForSameMethodId() {
     Timers timers = HdrTimers.create();
 
-    Timer first = timers.timer("service.call");
-    Timer second = timers.timer("service.call");
+    Timer first = timers.claim("service.call");
+    Timer second = timers.claim("service.call");
 
     assertSame(first, second);
   }
 
   @Test
-  void returnsDifferentTimersForDifferentIds() {
+  void returnsDifferentTimersForDifferentMethodIds() {
     Timers timers = HdrTimers.create();
 
-    Timer first = timers.timer("service.first");
-    Timer second = timers.timer("service.second");
+    Timer first = timers.claim("service.first");
+    Timer second = timers.claim("service.second");
 
     assertNotSame(first, second);
   }
@@ -57,21 +57,21 @@ class HdrTimersTest {
   void rejectsNullId() {
     Timers timers = HdrTimers.create();
 
-    assertThrows(NullPointerException.class, () -> timers.timer(null));
+    assertThrows(NullPointerException.class, () -> timers.claim(null));
   }
 
   @Test
   void rejectsBlankId() {
     Timers timers = HdrTimers.create();
 
-    assertThrows(IllegalArgumentException.class, () -> timers.timer(""));
-    assertThrows(IllegalArgumentException.class, () -> timers.timer("  "));
+    assertThrows(IllegalArgumentException.class, () -> timers.claim(""));
+    assertThrows(IllegalArgumentException.class, () -> timers.claim("  "));
   }
 
   @Test
   void snapshotsIncludePercentiles() {
     Timers timers = HdrTimers.create();
-    Timer timer = timers.timer("service.call");
+    Timer timer = timers.claim("service.call");
     for (int value = 1; value <= 100; value++) {
       timer.record(value);
     }
@@ -90,7 +90,7 @@ class HdrTimersTest {
   @Test
   void snapshotsReturnsImmutableCollection() {
     Timers timers = HdrTimers.create();
-    timers.timer("service.call");
+    timers.claim("service.call");
 
     Collection<TimerSnapshot> snapshots = timers.snapshots();
 
