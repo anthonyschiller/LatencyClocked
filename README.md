@@ -109,3 +109,13 @@ mvn -pl maven-plugin -am -Pplugin-it verify
 mvn -Pdependency-updates validate
 mvn -Papi-compat -Dapi.previous.version=<released-version> verify
 ```
+
+Run benchmarks with:
+
+```shell
+mvn -pl latency-jmh -am clean package
+java -jar latency-jmh/target/benchmarks.jar
+```
+
+Benchmark results are hardware, JVM, OS, and configuration dependent. See
+`docs/benchmarking.md`; no fixed performance claims are made without reproducible numbers.

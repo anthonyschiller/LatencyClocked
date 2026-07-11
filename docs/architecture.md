@@ -7,7 +7,7 @@ LatencyClocked is split into small Maven modules:
 - `hdr`: HDR Histogram backed timer implementation.
 - `core`: startup registration API and runtime handle, using HDR timers by default.
 - `maven-plugin`: build-time descriptor generation and timer field injection.
-- `jmh`: placeholder for future benchmarks.
+- `latency-jmh`: isolated JMH benchmark module.
 
 The `model` module contains shared API contracts under `com.ll.metrics.latency.timer`,
 snapshot records under `com.ll.metrics.latency.snapshot`, `@Timed` under
@@ -113,6 +113,11 @@ Runtime startup logging uses SLF4J. The core module depends only on `slf4j-api`;
 choose the binding. For production deployments that want asynchronous logging, use Log4j2's
 SLF4J 2 binding with `log4j-core` and LMAX Disruptor, then enable async loggers through
 Log4j2 configuration. Instrumented method bodies do not log.
+
+The `latency-jmh` module contains reproducible JMH benchmarks for plain calls, instrumented
+calls, and direct timer recording. It depends on JMH and shades a standalone
+`benchmarks.jar`, but those dependencies are isolated to the benchmark module and do not
+affect normal library consumers.
 
 Unsupported annotated targets fail during build-time scanning with clear messages:
 constructors, class initialisers, native methods, abstract methods, and default interface
