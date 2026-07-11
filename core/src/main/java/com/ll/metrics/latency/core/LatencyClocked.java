@@ -23,6 +23,7 @@ import org.slf4j.LoggerFactory;
 /** Entry point for startup descriptor loading and timer lookup. */
 public final class LatencyClocked {
   private static final Logger LOGGER = LoggerFactory.getLogger(LatencyClocked.class);
+  private static volatile boolean enabled = isEnabledPropertySet();
 
   private final Timers timers;
 
@@ -48,7 +49,8 @@ public final class LatencyClocked {
    */
   public static LatencyClocked initialise(Timers timers) {
     LatencyClocked latencyClocked = new LatencyClocked(timers);
-    if (!isEnabled()) {
+    enabled = isEnabledPropertySet();
+    if (!enabled()) {
       LOGGER.info(
           "LatencyClocked disabled by system property {}=false",
           LatencyClockedConstants.ENABLED_PROPERTY);
@@ -102,7 +104,12 @@ public final class LatencyClocked {
     return timers.timer(id);
   }
 
-  private static boolean isEnabled() {
+  /** Returns whether generated latency recording is currently enabled. */
+  public static boolean enabled() {
+    return enabled;
+  }
+
+  private static boolean isEnabledPropertySet() {
     return !"false".equalsIgnoreCase(System.getProperty(LatencyClockedConstants.ENABLED_PROPERTY));
   }
 

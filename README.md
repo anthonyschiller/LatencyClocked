@@ -40,7 +40,8 @@ Timer timer = latencyClocked.timer("some.id");
 Set `-Dlatency-clocked.enabled=false` to disable generated timer binding at startup.
 When disabled, `LatencyClocked.initialise()` skips descriptor loading and logs that
 LatencyClocked is disabled. Explicit timer lookup through the returned handle still uses
-the active `Timers` instance.
+the active `Timers` instance. Instrumented methods bypass generated timing code while
+`LatencyClocked.enabled()` is false.
 
 The Maven plugin provides `latency-clocked:scan`, bound by default to `process-classes`.
 It scans compiled classes for `@Timed` methods, injects matching private static synthetic
@@ -114,8 +115,17 @@ Run benchmarks with:
 
 ```shell
 mvn -pl latency-jmh -am clean package
-java -jar latency-jmh/target/benchmarks.jar
+java -jar latency-jmh/target/benchmarks.jar \
+  "com.ll.metrics.latency.jmh.LatencyClockedBenchmark.*"
+java -jar latency-jmh/target/benchmarks.jar \
+  "com.ll.metrics.latency.jmh.LatencyClockedBenchmark.*" \
+  -prof gc
 ```
+
+The JMH module also includes a Micrometer `@Timed` comparison using AspectJ compile-time
+weaving only. Micrometer and AspectJ dependencies are isolated to `latency-jmh`; no Spring,
+Java agent, or load-time weaving is used. The build verifies Micrometer weaving before the
+benchmark jar is produced.
 
 Benchmark results are hardware, JVM, OS, and configuration dependent. See
 `docs/benchmarking.md`; no fixed performance claims are made without reproducible numbers.

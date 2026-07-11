@@ -262,6 +262,36 @@ class LatencyInstrumentationBehaviorTest {
     }
   }
 
+  @Test
+  void disabledLatencyClockedSkipsInstrumentedCodeAndTimeCapture(@TempDir Path outputDirectory)
+      throws Exception {
+    compileGolden(outputDirectory);
+    instrument(outputDirectory);
+    String previousEnabledProperty = System.getProperty(LatencyClockedConstants.ENABLED_PROPERTY);
+    try (URLClassLoader classLoader =
+        new URLClassLoader(
+            new URL[] {outputDirectory.toUri().toURL()},
+            LatencyInstrumentationBehaviorTest.class.getClassLoader())) {
+      Thread currentThread = Thread.currentThread();
+      ClassLoader previousClassLoader = currentThread.getContextClassLoader();
+      currentThread.setContextClassLoader(classLoader);
+      try {
+        System.setProperty(LatencyClockedConstants.ENABLED_PROPERTY, "false");
+        Timers timers = InMemoryTimers.create();
+        LatencyClocked.initialise(timers);
+        Class<?> sampleClass = Class.forName(SAMPLE_CLASS_NAME, true, classLoader);
+        Object instance = sampleClass.getDeclaredConstructor().newInstance();
+
+        invoke(instance, "successfulVoid");
+
+        assertTrue(timers.snapshots().isEmpty());
+      } finally {
+        restoreEnabledProperty(previousEnabledProperty);
+        currentThread.setContextClassLoader(previousClassLoader);
+      }
+    }
+  }
+
   private static RuntimeFixture instrumentAndLoad(Path outputDirectory) throws Exception {
     compileGolden(outputDirectory);
     instrument(outputDirectory);
@@ -331,6 +361,16 @@ class LatencyInstrumentationBehaviorTest {
     return timers
         .timer(SAMPLE_CLASS_NAME + LatencyClockedConstants.CLASS_NAME_SEPARATOR + timerName)
         .snapshot();
+  }
+
+  private static void restoreEnabledProperty(String previousEnabledProperty) {
+    if (previousEnabledProperty == null) {
+      System.clearProperty(LatencyClockedConstants.ENABLED_PROPERTY);
+    } else {
+      System.setProperty(
+          LatencyClockedConstants.ENABLED_PROPERTY, previousEnabledProperty);
+    }
+    LatencyClocked.initialise(InMemoryTimers.create());
   }
 
   private record InstrumentationResult(

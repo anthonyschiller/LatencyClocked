@@ -1,6 +1,7 @@
 package com.ll.metrics.latency.maven.asm;
 
 import com.ll.metrics.latency.maven.model.LatencyDescriptorEntry;
+import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
@@ -25,9 +26,15 @@ final class TimedMethodInstrumenter extends AdviceAdapter {
 
   @Override
   protected void onMethodEnter() {
-    invokeStatic(AsmConstants.SYSTEM_TYPE, AsmConstants.NANO_TIME);
     startLocal = newLocal(Type.LONG_TYPE);
+    push(0L);
     storeLocal(startLocal, Type.LONG_TYPE);
+    Label skip = newLabel();
+    invokeStatic(AsmConstants.LATENCY_CLOCKED_TYPE, AsmConstants.ENABLED);
+    visitJumpInsn(Opcodes.IFEQ, skip);
+    invokeStatic(AsmConstants.SYSTEM_TYPE, AsmConstants.NANO_TIME);
+    storeLocal(startLocal, Type.LONG_TYPE);
+    mark(skip);
   }
 
   @Override
@@ -35,11 +42,15 @@ final class TimedMethodInstrumenter extends AdviceAdapter {
     if (opcode == ATHROW) {
       return;
     }
+    final Label skip = newLabel();
+    invokeStatic(AsmConstants.LATENCY_CLOCKED_TYPE, AsmConstants.ENABLED);
+    visitJumpInsn(Opcodes.IFEQ, skip);
     visitFieldInsn(
         Opcodes.GETSTATIC, internalClassName, entry.fieldName(), AsmConstants.TIMER_DESCRIPTOR);
     invokeStatic(AsmConstants.SYSTEM_TYPE, AsmConstants.NANO_TIME);
     loadLocal(startLocal, Type.LONG_TYPE);
     math(SUB, Type.LONG_TYPE);
     invokeInterface(AsmConstants.TIMER_TYPE, AsmConstants.RECORD);
+    mark(skip);
   }
 }

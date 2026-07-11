@@ -1,7 +1,13 @@
 package com.ll.metrics.latency.jmh;
 
 import com.ll.metrics.latency.annotations.Timed;
+import com.ll.metrics.latency.constants.LatencyClockedConstants;
 import com.ll.metrics.latency.core.LatencyClocked;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Metrics;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -13,10 +19,11 @@ import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
+import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.infra.Blackhole;
 
-/** JMH benchmarks for baseline calls, instrumented calls, and direct timer recording. */
+/** JMH benchmarks for plain calls, instrumented calls, and direct timer recording. */
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @Warmup(iterations = 3, time = 2, timeUnit = TimeUnit.SECONDS)
@@ -25,143 +32,339 @@ import org.openjdk.jmh.infra.Blackhole;
 public class LatencyClockedBenchmark {
 
   @Benchmark
-  public void plainVoidMethod(BaselineState state) {
-    state.target.voidMethod();
+  public long baselineNanoTime() {
+    return System.nanoTime();
   }
 
   @Benchmark
-  public int plainPrimitiveReturnMethod(BaselineState state) {
-    return state.target.primitiveReturnMethod();
+  public void plainVoidCall(PlainBenchmarkState state) {
+    state.target.voidCall();
   }
 
   @Benchmark
-  public Object plainObjectReturnMethod(BaselineState state) {
-    return state.target.objectReturnMethod();
+  public int plainPrimitiveReturn(PlainBenchmarkState state) {
+    return state.target.primitiveReturn();
   }
 
   @Benchmark
-  public void plainStaticMethod() {
-    BaselineTarget.staticMethod();
+  public Object plainObjectReturn(PlainBenchmarkState state) {
+    return state.target.objectReturn();
   }
 
   @Benchmark
-  public void timedVoidMethodWithSingleWriterTimer(SingleWriterInstrumentedState state) {
-    state.target.voidMethod();
+  public void plainStaticCall() {
+    PlainTarget.staticCall();
   }
 
   @Benchmark
-  public int timedPrimitiveReturnMethodWithSingleWriterTimer(
-      SingleWriterInstrumentedState state) {
-    return state.target.primitiveReturnMethod();
+  public void latencyClockedVoidCall(
+      LatencyClockedBindingState bindingState, LatencyClockedThreadState state) {
+    state.target.voidCall();
   }
 
   @Benchmark
-  public Object timedObjectReturnMethodWithSingleWriterTimer(SingleWriterInstrumentedState state) {
-    return state.target.objectReturnMethod();
+  public int latencyClockedPrimitiveReturn(
+      LatencyClockedBindingState bindingState, LatencyClockedThreadState state) {
+    return state.target.primitiveReturn();
   }
 
   @Benchmark
-  public void timedStaticMethodWithSingleWriterTimer(SingleWriterInstrumentedState state) {
-    InstrumentedTarget.staticMethod();
+  public Object latencyClockedObjectReturn(
+      LatencyClockedBindingState bindingState, LatencyClockedThreadState state) {
+    return state.target.objectReturn();
   }
 
   @Benchmark
-  public void timedVoidMethodWithThreadSafeTimer(ThreadSafeInstrumentedState state) {
-    state.target.voidMethod();
+  public void latencyClockedStaticCall(LatencyClockedBindingState bindingState) {
+    LatencyClockedTarget.staticCall();
   }
 
   @Benchmark
-  public int timedPrimitiveReturnMethodWithThreadSafeTimer(ThreadSafeInstrumentedState state) {
-    return state.target.primitiveReturnMethod();
+  public void latencyClockedDisabledVoidCall(
+      LatencyClockedDisabledBindingState bindingState, LatencyClockedDisabledThreadState state) {
+    state.target.voidCall();
   }
 
   @Benchmark
-  public Object timedObjectReturnMethodWithThreadSafeTimer(ThreadSafeInstrumentedState state) {
-    return state.target.objectReturnMethod();
+  public int latencyClockedDisabledPrimitiveReturn(
+      LatencyClockedDisabledBindingState bindingState, LatencyClockedDisabledThreadState state) {
+    return state.target.primitiveReturn();
   }
 
   @Benchmark
-  public void timedStaticMethodWithThreadSafeTimer(ThreadSafeInstrumentedState state) {
-    InstrumentedTarget.staticMethod();
+  public Object latencyClockedDisabledObjectReturn(
+      LatencyClockedDisabledBindingState bindingState, LatencyClockedDisabledThreadState state) {
+    return state.target.objectReturn();
+  }
+
+  @Benchmark
+  public void latencyClockedDisabledStaticCall(
+      LatencyClockedDisabledBindingState bindingState) {
+    LatencyClockedDisabledTarget.staticCall();
+  }
+
+  @Benchmark
+  public void latencyClockedThreadSafeVoidCall(
+      LatencyClockedThreadSafeBindingState bindingState, LatencyClockedThreadState state) {
+    state.target.voidCall();
+  }
+
+  @Benchmark
+  public int latencyClockedThreadSafePrimitiveReturn(
+      LatencyClockedThreadSafeBindingState bindingState, LatencyClockedThreadState state) {
+    return state.target.primitiveReturn();
+  }
+
+  @Benchmark
+  public Object latencyClockedThreadSafeObjectReturn(
+      LatencyClockedThreadSafeBindingState bindingState, LatencyClockedThreadState state) {
+    return state.target.objectReturn();
+  }
+
+  @Benchmark
+  public void latencyClockedThreadSafeStaticCall(
+      LatencyClockedThreadSafeBindingState bindingState) {
+    LatencyClockedTarget.staticCall();
+  }
+
+  @Benchmark
+  public void micrometerTimedVoidCall(
+      MicrometerRegistryState registryState, MicrometerThreadState state) {
+    state.target.voidCall();
+  }
+
+  @Benchmark
+  public int micrometerTimedPrimitiveReturn(
+      MicrometerRegistryState registryState, MicrometerThreadState state) {
+    return state.target.primitiveReturn();
+  }
+
+  @Benchmark
+  public Object micrometerTimedObjectReturn(
+      MicrometerRegistryState registryState, MicrometerThreadState state) {
+    return state.target.objectReturn();
+  }
+
+  @Benchmark
+  public void micrometerTimedStaticCall(MicrometerRegistryState registryState) {
+    MicrometerTarget.staticCall();
   }
 
   /** Per-thread state for plain baseline calls. */
   @State(Scope.Thread)
-  public static class BaselineState {
-    private BaselineTarget target;
+  public static class PlainBenchmarkState {
+    private PlainTarget target;
 
     @Setup(Level.Trial)
     public void setup() {
-      target = new BaselineTarget();
+      target = new PlainTarget();
     }
   }
 
-  /** Per-thread state for instrumented calls bound to single-writer HDR timers. */
-  @State(Scope.Thread)
-  public static class SingleWriterInstrumentedState {
-    private InstrumentedTarget target;
-
+  /** Benchmark-scoped startup binding for single-writer latency-clocked timers. */
+  @State(Scope.Benchmark)
+  public static class LatencyClockedBindingState {
     @Setup(Level.Trial)
     public void setup() {
       LatencyClocked.initialise();
-      target = new InstrumentedTarget();
     }
   }
 
-  /** Per-thread state for instrumented calls bound to thread-safe HDR timers. */
-  @State(Scope.Thread)
-  public static class ThreadSafeInstrumentedState {
-    private InstrumentedTarget target;
-
+  /** Benchmark-scoped startup binding for thread-safe latency-clocked timers. */
+  @State(Scope.Benchmark)
+  public static class LatencyClockedThreadSafeBindingState {
     @Setup(Level.Trial)
     public void setup() {
       LatencyClocked.initialisedThreadSafe();
-      target = new InstrumentedTarget();
     }
   }
 
-  private static final class BaselineTarget {
+  /** Benchmark-scoped disabled startup path for latency-clocked timers. */
+  @State(Scope.Benchmark)
+  public static class LatencyClockedDisabledBindingState {
+    private String previousEnabledProperty;
+
+    /** Disables startup binding and calls the normal startup API. */
+    @Setup(Level.Trial)
+    public void setup() {
+      previousEnabledProperty = System.getProperty(LatencyClockedConstants.ENABLED_PROPERTY);
+      System.setProperty(LatencyClockedConstants.ENABLED_PROPERTY, "false");
+      LatencyClocked.initialise();
+    }
+
+    /** Restores the previous enabled property value after the benchmark trial. */
+    @TearDown(Level.Trial)
+    public void tearDown() {
+      if (previousEnabledProperty == null) {
+        System.clearProperty(LatencyClockedConstants.ENABLED_PROPERTY);
+      } else {
+        System.setProperty(LatencyClockedConstants.ENABLED_PROPERTY, previousEnabledProperty);
+      }
+      LatencyClocked.initialise();
+    }
+  }
+
+  /** Per-thread latency-clocked invocation target. */
+  @State(Scope.Thread)
+  public static class LatencyClockedThreadState {
+    private LatencyClockedTarget target;
+
+    @Setup(Level.Trial)
+    public void setup() {
+      target = new LatencyClockedTarget();
+    }
+  }
+
+  /** Per-thread latency-clocked invocation target used with disabled startup binding. */
+  @State(Scope.Thread)
+  public static class LatencyClockedDisabledThreadState {
+    private LatencyClockedDisabledTarget target;
+
+    @Setup(Level.Trial)
+    public void setup() {
+      target = new LatencyClockedDisabledTarget();
+    }
+  }
+
+  /** Benchmark-scoped Micrometer registry lifecycle. */
+  @State(Scope.Benchmark)
+  public static class MicrometerRegistryState {
+    private final List<MeterRegistry> previousRegistries = new ArrayList<>();
+    private SimpleMeterRegistry micrometerRegistry;
+
+    /** Installs a single Micrometer registry and pre-registers benchmark meters. */
+    @Setup(Level.Trial)
+    public void setup() {
+      previousRegistries.addAll(Metrics.globalRegistry.getRegistries());
+      previousRegistries.forEach(Metrics::removeRegistry);
+      Metrics.globalRegistry.clear();
+      micrometerRegistry = new SimpleMeterRegistry();
+      Metrics.addRegistry(micrometerRegistry);
+      preRegisterMeters();
+    }
+
+    /** Removes the benchmark registry and restores any registry present before the trial. */
+    @TearDown(Level.Trial)
+    public void tearDown() {
+      Metrics.removeRegistry(micrometerRegistry);
+      micrometerRegistry.close();
+      Metrics.globalRegistry.clear();
+      previousRegistries.forEach(Metrics::addRegistry);
+      previousRegistries.clear();
+    }
+
+    private static void preRegisterMeters() {
+      MicrometerTarget target = new MicrometerTarget();
+      target.voidCall();
+      target.primitiveReturn();
+      target.objectReturn();
+      MicrometerTarget.staticCall();
+    }
+  }
+
+  /** Per-thread Micrometer invocation target. */
+  @State(Scope.Thread)
+  public static class MicrometerThreadState {
+    private MicrometerTarget target;
+
+    @Setup(Level.Trial)
+    public void setup() {
+      target = new MicrometerTarget();
+    }
+  }
+
+  static final class PlainTarget {
     private int value = 41;
     private final Object object = new Object();
 
-    private void voidMethod() {
+    void voidCall() {
       value++;
     }
 
-    private int primitiveReturnMethod() {
+    int primitiveReturn() {
       return value + 1;
     }
 
-    private Object objectReturnMethod() {
+    Object objectReturn() {
       return object;
     }
 
-    private static void staticMethod() {
+    static void staticCall() {
       Blackhole.consumeCPU(1);
     }
   }
 
-  private static final class InstrumentedTarget {
+  static final class LatencyClockedTarget {
     private int value = 41;
     private final Object object = new Object();
 
-    @Timed("jmh.timed.void")
-    private void voidMethod() {
+    @Timed("benchmark.latency-clocked.void")
+    void voidCall() {
       value++;
     }
 
-    @Timed("jmh.timed.primitive")
-    private int primitiveReturnMethod() {
+    @Timed("benchmark.latency-clocked.primitive")
+    int primitiveReturn() {
       return value + 1;
     }
 
-    @Timed("jmh.timed.object")
-    private Object objectReturnMethod() {
+    @Timed("benchmark.latency-clocked.object")
+    Object objectReturn() {
       return object;
     }
 
-    @Timed("jmh.timed.static")
-    private static void staticMethod() {
+    @Timed("benchmark.latency-clocked.static")
+    static void staticCall() {
+      Blackhole.consumeCPU(1);
+    }
+  }
+
+  static final class LatencyClockedDisabledTarget {
+    private int value = 41;
+    private final Object object = new Object();
+
+    @Timed("benchmark.latency-clocked.disabled.void")
+    void voidCall() {
+      value++;
+    }
+
+    @Timed("benchmark.latency-clocked.disabled.primitive")
+    int primitiveReturn() {
+      return value + 1;
+    }
+
+    @Timed("benchmark.latency-clocked.disabled.object")
+    Object objectReturn() {
+      return object;
+    }
+
+    @Timed("benchmark.latency-clocked.disabled.static")
+    static void staticCall() {
+      Blackhole.consumeCPU(1);
+    }
+  }
+
+  static final class MicrometerTarget {
+    private int value = 41;
+    private final Object object = new Object();
+
+    @io.micrometer.core.annotation.Timed(value = "benchmark.micrometer.void")
+    void voidCall() {
+      value++;
+    }
+
+    @io.micrometer.core.annotation.Timed(value = "benchmark.micrometer.primitive")
+    int primitiveReturn() {
+      return value + 1;
+    }
+
+    @io.micrometer.core.annotation.Timed(value = "benchmark.micrometer.object")
+    Object objectReturn() {
+      return object;
+    }
+
+    @io.micrometer.core.annotation.Timed(value = "benchmark.micrometer.static")
+    static void staticCall() {
       Blackhole.consumeCPU(1);
     }
   }
