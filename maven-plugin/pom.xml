@@ -96,6 +96,45 @@
                 <plugins>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-install-plugin</artifactId>
+                        <version>3.1.3</version>
+                        <executions>
+                            <execution>
+                                <id>install-core-for-invoker-tests</id>
+                                <phase>pre-integration-test</phase>
+                                <goals>
+                                    <goal>install-file</goal>
+                                </goals>
+                                <configuration>
+                                    <file>
+                                        ${project.basedir}/../core/target/latency-clocked-core-${project.version}.jar
+                                    </file>
+                                    <pomFile>${project.basedir}/../core/pom.xml</pomFile>
+                                    <localRepositoryPath>
+                                        ${project.build.directory}/it-local-repository
+                                    </localRepositoryPath>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>install-hdr-for-invoker-tests</id>
+                                <phase>pre-integration-test</phase>
+                                <goals>
+                                    <goal>install-file</goal>
+                                </goals>
+                                <configuration>
+                                    <file>
+                                        ${project.basedir}/../hdr/target/latency-clocked-hdr-${project.version}.jar
+                                    </file>
+                                    <pomFile>${project.basedir}/../hdr/pom.xml</pomFile>
+                                    <localRepositoryPath>
+                                        ${project.build.directory}/it-local-repository
+                                    </localRepositoryPath>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-invoker-plugin</artifactId>
                         <version>${maven.invoker.version}</version>
                         <configuration>

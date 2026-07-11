@@ -47,10 +47,32 @@ final class TimedMethodInstrumenter extends AdviceAdapter {
     visitJumpInsn(Opcodes.IFEQ, skip);
     visitFieldInsn(
         Opcodes.GETSTATIC, internalClassName, entry.fieldName(), AsmConstants.TIMER_DESCRIPTOR);
+    ensureTimerIsBound();
     invokeStatic(AsmConstants.SYSTEM_TYPE, AsmConstants.NANO_TIME);
     loadLocal(startLocal, Type.LONG_TYPE);
     math(SUB, Type.LONG_TYPE);
     invokeInterface(AsmConstants.TIMER_TYPE, AsmConstants.RECORD);
     mark(skip);
+  }
+
+  private void ensureTimerIsBound() {
+    Label bound = newLabel();
+    dup();
+    visitJumpInsn(Opcodes.IFNONNULL, bound);
+    pop();
+    throwException(Type.getType(IllegalStateException.class), uninitialisedTimerMessage());
+    mark(bound);
+  }
+
+  private String uninitialisedTimerMessage() {
+    return "LatencyClocked timer field "
+        + entry.fieldName()
+        + " for "
+        + entry.className()
+        + "#"
+        + entry.methodName()
+        + entry.methodDescriptor()
+        + " is not bound. Call LatencyClocked.initialise(...) before invoking @Timed methods "
+        + "and ensure latency-clocked:scan runs for this module.";
   }
 }

@@ -1,6 +1,7 @@
 package com.ll.metrics.latency.maven;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -14,12 +15,16 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
+import java.util.jar.JarOutputStream;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -162,6 +167,29 @@ class LatencyDescriptorGeneratorTest {
                 "com.example.Service", "other", "()V", "__latency_clocked_timer_1", "b")));
 
     assertEquals("com.example.Service", Files.readString(descriptor(outputDirectory)).trim());
+  }
+
+  @Test
+  void generatedIndexIsIncludedInPackagedJar(@TempDir Path outputDirectory) throws IOException {
+    copyClassToOutputDirectory(SampleTimedClass.class, outputDirectory);
+    scanInjectAndWriteDescriptor(outputDirectory);
+    Path jar = outputDirectory.resolve("sample.jar");
+
+    try (JarOutputStream outputStream = new JarOutputStream(Files.newOutputStream(jar))) {
+      String indexEntry = LatencyClockedConstants.DESCRIPTOR_RESOURCE;
+      outputStream.putNextEntry(new JarEntry(indexEntry));
+      outputStream.write(Files.readAllBytes(descriptor(outputDirectory)));
+      outputStream.closeEntry();
+    }
+
+    try (JarFile jarFile = new JarFile(jar.toFile())) {
+      JarEntry index = jarFile.getJarEntry(LatencyClockedConstants.DESCRIPTOR_RESOURCE);
+      assertNotNull(index);
+      String indexContent =
+          new String(jarFile.getInputStream(index).readAllBytes(), StandardCharsets.UTF_8);
+      assertEquals(SAMPLE_CLASS_NAME, indexContent.trim());
+      assertTrue(indexContent.lines().noneMatch(line -> line.contains("|")));
+    }
   }
 
   @Test

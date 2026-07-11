@@ -1,6 +1,7 @@
 package com.ll.metrics.latency.maven;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -16,13 +17,14 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-class LatencyInstrumentationBehaviorTest {
+class InstrumentationBehaviourTest {
   private static final String SAMPLE_CLASS_NAME = "golden.GoldenTimedSamples";
 
   @Test
@@ -246,12 +248,17 @@ class LatencyInstrumentationBehaviorTest {
   void runningPluginTwiceDoesNotDoubleInstrument(@TempDir Path outputDirectory) throws Exception {
     compileGolden(outputDirectory);
     InstrumentationResult first = instrument(outputDirectory);
-    InstrumentationResult second = instrument(outputDirectory);
 
     assertEquals(18, first.injectionResult().instrumentedMethods());
     assertEquals(0, first.injectionResult().skippedInstrumentedMethods());
+    String firstIndex = Files.readString(descriptor(outputDirectory));
+
+    InstrumentationResult second = instrument(outputDirectory);
+
     assertEquals(0, second.injectionResult().instrumentedMethods());
     assertEquals(18, second.injectionResult().skippedInstrumentedMethods());
+    String secondIndex = Files.readString(descriptor(outputDirectory));
+    assertEquals(firstIndex, secondIndex);
 
     try (RuntimeFixture fixture = load(outputDirectory)) {
       Object instance = fixture.newInstance();
@@ -259,6 +266,57 @@ class LatencyInstrumentationBehaviorTest {
       invoke(instance, "successfulVoid");
 
       assertEquals(1, snapshot(fixture.timers(), "successfulVoid").count());
+    }
+  }
+
+  @Test
+  void callingInstrumentedMethodBeforeInitialiseFailsClearly(@TempDir Path outputDirectory)
+      throws Exception {
+    compileGolden(outputDirectory);
+    instrument(outputDirectory);
+    try (URLClassLoader classLoader =
+        new URLClassLoader(
+            new URL[] {outputDirectory.toUri().toURL()},
+            InstrumentationBehaviourTest.class.getClassLoader())) {
+      Class<?> sampleClass = Class.forName(SAMPLE_CLASS_NAME, true, classLoader);
+      Object instance = sampleClass.getDeclaredConstructor().newInstance();
+
+      InvocationTargetException exception =
+          assertThrows(InvocationTargetException.class, () -> invoke(instance, "successfulVoid"));
+
+      assertInstanceOf(IllegalStateException.class, exception.getCause());
+      assertTrue(exception.getCause().getMessage().contains("timer field"));
+      assertTrue(exception.getCause().getMessage().contains("Call LatencyClocked.initialise"));
+      assertTrue(exception.getCause().getMessage().contains("latency-clocked:scan"));
+    }
+  }
+
+  @Test
+  void callingInitialiseTwiceRebindsSafely(@TempDir Path outputDirectory) throws Exception {
+    compileGolden(outputDirectory);
+    instrument(outputDirectory);
+    try (URLClassLoader classLoader =
+        new URLClassLoader(
+            new URL[] {outputDirectory.toUri().toURL()},
+            InstrumentationBehaviourTest.class.getClassLoader())) {
+      Thread currentThread = Thread.currentThread();
+      ClassLoader previousClassLoader = currentThread.getContextClassLoader();
+      currentThread.setContextClassLoader(classLoader);
+      try {
+        Timers firstTimers = InMemoryTimers.create();
+        Timers secondTimers = InMemoryTimers.create();
+        LatencyClocked.initialise(firstTimers);
+        LatencyClocked.initialise(secondTimers);
+        Class<?> sampleClass = Class.forName(SAMPLE_CLASS_NAME, true, classLoader);
+        Object instance = sampleClass.getDeclaredConstructor().newInstance();
+
+        invoke(instance, "successfulVoid");
+
+        assertEquals(0, snapshot(firstTimers, "successfulVoid").count());
+        assertEquals(1, snapshot(secondTimers, "successfulVoid").count());
+      } finally {
+        currentThread.setContextClassLoader(previousClassLoader);
+      }
     }
   }
 
@@ -271,7 +329,7 @@ class LatencyInstrumentationBehaviorTest {
     try (URLClassLoader classLoader =
         new URLClassLoader(
             new URL[] {outputDirectory.toUri().toURL()},
-            LatencyInstrumentationBehaviorTest.class.getClassLoader())) {
+            InstrumentationBehaviourTest.class.getClassLoader())) {
       Thread currentThread = Thread.currentThread();
       ClassLoader previousClassLoader = currentThread.getContextClassLoader();
       currentThread.setContextClassLoader(classLoader);
@@ -312,7 +370,7 @@ class LatencyInstrumentationBehaviorTest {
     URLClassLoader classLoader =
         new URLClassLoader(
             new URL[] {outputDirectory.toUri().toURL()},
-            LatencyInstrumentationBehaviorTest.class.getClassLoader());
+            InstrumentationBehaviourTest.class.getClassLoader());
     Thread currentThread = Thread.currentThread();
     ClassLoader previousClassLoader = currentThread.getContextClassLoader();
     currentThread.setContextClassLoader(classLoader);
@@ -328,6 +386,13 @@ class LatencyInstrumentationBehaviorTest {
 
   private static void compileGolden(Path outputDirectory) throws IOException {
     GoldenFixtureCompiler.compile(outputDirectory, "GoldenTimedSamples.java");
+  }
+
+  private static Path descriptor(Path outputDirectory) {
+    return outputDirectory
+        .resolve(LatencyClockedConstants.DESCRIPTOR_ROOT)
+        .resolve(LatencyClockedConstants.DESCRIPTOR_DIRECTORY)
+        .resolve(LatencyClockedConstants.DESCRIPTOR_FILE);
   }
 
   private static Object invoke(Object target, String methodName)

@@ -40,3 +40,20 @@ is unsupported. Synthetic and bridge methods are skipped by the scanner, so comp
 bridge methods do not receive their own timers. The plugin continues to use ASM frame and
 max-stack computation so instrumented classes must load normally; tests fail if a class cannot
 be verified.
+
+Startup lifecycle cases:
+
+- Calling `LatencyClocked.initialise(timers)` once binds generated timer fields.
+- Calling `LatencyClocked.initialise(timers)` again is safe and rebinds fields to the latest
+  timer catalogue.
+- Calling an instrumented method before startup binding fails with an actionable
+  `IllegalStateException` when LatencyClocked is enabled.
+- Calling an instrumented method while `latency-clocked.enabled=false` bypasses generated
+  timing code.
+
+Build idempotency cases:
+
+- Running the plugin more than once keeps the index content stable.
+- Generated timer fields are not duplicated.
+- The generated `__latency_clocked$bind(Timers)` method is not duplicated.
+- Timed method bodies are not instrumented twice, so successful calls do not double-record.

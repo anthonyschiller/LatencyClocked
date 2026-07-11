@@ -30,6 +30,15 @@ Generated bind methods assign fields with embedded timer ids:
 __latency_clocked_timer_0 = timers.timer("some.id");
 ```
 
+Quick start:
+
+1. Add `latency-clocked-core` to the application runtime.
+2. Configure `latency-clocked-maven-plugin` in every Maven module that contains `@Timed`
+   methods.
+3. Annotate methods with `@Timed` or `@Timed("custom.id")`.
+4. Call `LatencyClocked.initialise()` once during application startup before invoking timed
+   methods.
+
 Application code can keep the returned handle for explicit timer lookup:
 
 ```java
@@ -47,6 +56,7 @@ The Maven plugin provides `latency-clocked:scan`, bound by default to `process-c
 It scans compiled classes for `@Timed` methods, injects matching private static synthetic
 `Timer` fields, injects `__latency_clocked$bind(Timers)`, instruments timed method bodies,
 and writes class names to `target/classes/META-INF/latency-clocked/index`.
+That index is packaged into the module jar by the normal Maven jar lifecycle.
 It also writes `target/latency-clocked/instrumentation-report.txt` with the instrumented
 class, method, descriptor, generated field, and timer id. Use
 `-Dlatency-clocked.verbose=true` to promote detailed plugin diagnostics from Maven debug
@@ -58,6 +68,12 @@ Timed methods call `System.nanoTime()` at method entry and record elapsed nanose
 every normal return path. Exception exits intentionally do not record latency. Timing is
 inserted into the original method body, so instrumentation adds no wrapper stack frames and
 uses no runtime proxies.
+
+Calling an instrumented method while LatencyClocked is enabled but before startup binding
+has run fails fast with an `IllegalStateException` telling the caller to invoke
+`LatencyClocked.initialise(...)` and check that `latency-clocked:scan` ran for the module.
+Calling `LatencyClocked.initialise(...)` more than once is safe; generated fields are
+rebound to the most recently supplied `Timers` instance.
 
 LatencyClocked is HDR-first because production latency telemetry needs useful percentile
 snapshots. The HDR implementation keeps a compact histogram per timer rather than retaining
@@ -129,3 +145,5 @@ benchmark jar is produced.
 
 Benchmark results are hardware, JVM, OS, and configuration dependent. See
 `docs/benchmarking.md`; no fixed performance claims are made without reproducible numbers.
+
+See `docs/troubleshooting.md` for common startup and instrumentation failures.

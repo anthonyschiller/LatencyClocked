@@ -23,12 +23,12 @@ import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 
-class LatencyScanMojoTest {
+class LatencyClockedScanMojoTest {
   @Test
   void executeScansInjectsTimerFieldAndWritesDescriptor(@TempDir Path outputDirectory)
       throws Exception {
     copyClassToOutputDirectory(SampleTimedClass.class, outputDirectory);
-    LatencyScanMojo mojo = new LatencyScanMojo();
+    LatencyClockedScanMojo mojo = new LatencyClockedScanMojo();
     setOutputDirectory(mojo, outputDirectory.toFile());
     Path reportDirectory = outputDirectory.resolve("reports");
     setReportDirectory(mojo, reportDirectory.toFile());
@@ -47,7 +47,7 @@ class LatencyScanMojoTest {
   @Test
   void executeFailsForInvalidTimedUsage(@TempDir Path outputDirectory) throws Exception {
     GoldenFixtureCompiler.compile(outputDirectory, "UnsupportedNativeTimedSample.java");
-    LatencyScanMojo mojo = new LatencyScanMojo();
+    LatencyClockedScanMojo mojo = new LatencyClockedScanMojo();
     setOutputDirectory(mojo, outputDirectory.toFile());
     setReportDirectory(mojo, outputDirectory.resolve("reports").toFile());
 
@@ -64,16 +64,16 @@ class LatencyScanMojoTest {
                 "@Timed cannot be applied to native methods because there is no bytecode body"));
   }
 
-  private static void setOutputDirectory(LatencyScanMojo mojo, File outputDirectory)
+  private static void setOutputDirectory(LatencyClockedScanMojo mojo, File outputDirectory)
       throws ReflectiveOperationException {
-    Field field = LatencyScanMojo.class.getDeclaredField("outputDirectory");
+    Field field = LatencyClockedScanMojo.class.getDeclaredField("outputDirectory");
     field.setAccessible(true);
     field.set(mojo, outputDirectory);
   }
 
-  private static void setReportDirectory(LatencyScanMojo mojo, File reportDirectory)
+  private static void setReportDirectory(LatencyClockedScanMojo mojo, File reportDirectory)
       throws ReflectiveOperationException {
-    Field field = LatencyScanMojo.class.getDeclaredField("reportDirectory");
+    Field field = LatencyClockedScanMojo.class.getDeclaredField("reportDirectory");
     field.setAccessible(true);
     field.set(mojo, reportDirectory);
   }

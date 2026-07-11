@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.ll.metrics.latency.it</groupId>
+    <artifactId>multi-module-latency-clocked-it</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <modules>
+        <module>module-one</module>
+        <module>module-two</module>
+        <module>app</module>
+    </modules>
+
+    <properties>
+        <junit.jupiter.version>5.10.3</junit.jupiter.version>
+        <latency-clocked.version>@project.version@</latency-clocked.version>
+        <maven.compiler.release>21</maven.compiler.release>
+        <maven.surefire.version>3.5.6</maven.surefire.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>${maven.surefire.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>com.ll.metrics</groupId>
+                    <artifactId>latency-clocked-maven-plugin</artifactId>
+                    <version>${latency-clocked.version}</version>
+                    <executions>
+                        <execution>
+                            <id>scan-classes</id>
+                            <goals>
+                                <goal>scan</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+</project>

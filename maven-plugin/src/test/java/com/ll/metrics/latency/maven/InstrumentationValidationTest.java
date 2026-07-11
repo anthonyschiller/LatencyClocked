@@ -10,7 +10,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-class LatencyInstrumentationValidationTest {
+class InstrumentationValidationTest {
   @Test
   void scanRejectsAbstractTimedMethods(@TempDir Path outputDirectory) throws Exception {
     GoldenFixtureCompiler.compile(outputDirectory, "UnsupportedAbstractTimedSample.java");

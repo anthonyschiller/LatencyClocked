@@ -169,6 +169,7 @@ class LatencyClockedTest {
                 withDescriptorClasspath(tempDir, (ThrowingInitialise) LatencyClocked::initialise));
 
     assertTrue(exception.getMessage().contains("missing generated bind method"));
+    assertTrue(exception.getMessage().contains(LatencyClockedConstants.DESCRIPTOR_RESOURCE));
   }
 
   @Test

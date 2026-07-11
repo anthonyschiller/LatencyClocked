@@ -14,7 +14,7 @@ import org.apache.maven.plugins.annotations.Parameter;
 
 /** Maven goal that scans compiled classes and writes the latency descriptor index. */
 @Mojo(name = "scan", defaultPhase = LifecyclePhase.PROCESS_CLASSES, threadSafe = true)
-public final class LatencyScanMojo extends AbstractMojo {
+public final class LatencyClockedScanMojo extends AbstractMojo {
   @Parameter(defaultValue = "${project.build.outputDirectory}", readonly = true, required = true)
   private File outputDirectory;
 

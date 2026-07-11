@@ -158,7 +158,9 @@ public final class LatencyClocked {
       throw new IllegalStateException(
           "Latency descriptor class '"
               + className
-              + "' is missing generated bind method "
+              + "' from "
+              + LatencyClockedConstants.DESCRIPTOR_RESOURCE
+              + " is missing generated bind method "
               + LatencyClockedConstants.BIND_METHOD
               + "("
               + Timers.class.getName()
