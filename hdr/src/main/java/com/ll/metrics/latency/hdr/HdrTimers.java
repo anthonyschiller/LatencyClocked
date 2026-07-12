@@ -10,15 +10,33 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Supplier;
 
-/** HDR Histogram backed generated method timer catalogue that creates timers on first bind. */
+/**
+ * HDR Histogram backed generated method timer catalogue that creates timers on first bind.
+ *
+ * <p>This is the production timer factory surface. HDR Histogram remains an implementation
+ * detail; public snapshots expose plain nanosecond values and percentiles.
+ */
 public final class HdrTimers implements Timers {
   private final ConcurrentMap<String, Timer> timers = new ConcurrentHashMap<>();
   private final Supplier<Timer> timerFactory;
 
+  /**
+   * Creates a timer catalogue backed by single-writer HDR timers.
+   *
+   * <p>Use this when each generated method timer is recorded by one thread at a time or when the
+   * application accepts the lower-overhead non-concurrent implementation.
+   *
+   * @return HDR-backed timers
+   */
   public static HdrTimers create() {
     return new HdrTimers(HdrTimer::new);
   }
 
+  /**
+   * Creates a timer catalogue backed by thread-safe HDR timers.
+   *
+   * @return concurrent HDR-backed timers
+   */
   public static HdrTimers createWithThreadsafeTimers() {
     return new HdrTimers(ThreadSafeHdrTimer::new);
   }

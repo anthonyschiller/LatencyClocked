@@ -7,8 +7,8 @@ reproducible measurements rather than fixed claims.
 Build and run the benchmark jar with:
 
 ```shell
-mvn -pl latency-jmh -am clean package
-java -jar latency-jmh/target/benchmarks.jar
+mvn -pl benchmarking-jmh -am clean package
+java -jar benchmarking-jmh/target/benchmarks.jar
 ```
 
 The `-am` flag builds the local latency-clocked Maven plugin first so the benchmark classes
@@ -17,14 +17,14 @@ can be instrumented during `process-classes`.
 Run only the benchmark class with:
 
 ```shell
-java -jar latency-jmh/target/benchmarks.jar \
+java -jar benchmarking-jmh/target/benchmarks.jar \
   "com.ll.metrics.latency.jmh.LatencyClockedBenchmark.*"
 ```
 
 Run the same benchmarks with JMH's GC profiler with:
 
 ```shell
-java -jar latency-jmh/target/benchmarks.jar \
+java -jar benchmarking-jmh/target/benchmarks.jar \
   "com.ll.metrics.latency.jmh.LatencyClockedBenchmark.*" \
   -prof gc
 ```
@@ -44,7 +44,7 @@ The benchmark module covers:
 - Latency-clocked methods bound through `LatencyClocked.initialise()`.
 - Latency-clocked methods bound through `LatencyClocked.initialisedThreadSafe()`.
 
-AspectJ compile-time weaving is configured only in `latency-jmh`. The module first compiles
+AspectJ compile-time weaving is configured only in `benchmarking-jmh`. The module first compiles
 normally with javac so JMH annotation processing can generate benchmark harnesses. The
 latency-clocked Maven plugin then instruments latency-clocked fixtures. Finally, the
 AspectJ Maven plugin binary-weaves `target/classes` using `micrometer-core` as an aspect

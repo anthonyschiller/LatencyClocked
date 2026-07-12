@@ -7,10 +7,21 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-/** In-memory generated method timer catalogue that creates timers on first bind. */
+/**
+ * In-memory generated method timer catalogue that creates timers on first bind.
+ *
+ * <p>This implementation is primarily intended for tests and small examples. Production startup
+ * should use the HDR-backed factories in {@code latency-clocked-hdr} through the core startup
+ * facade.
+ */
 public final class InMemoryTimers implements Timers {
   private final ConcurrentMap<String, Timer> timers = new ConcurrentHashMap<>();
 
+  /**
+   * Creates an empty in-memory timer catalogue.
+   *
+   * @return in-memory timers
+   */
   public static InMemoryTimers create() {
     return new InMemoryTimers();
   }

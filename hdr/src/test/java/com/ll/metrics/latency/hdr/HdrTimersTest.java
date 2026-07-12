@@ -98,4 +98,20 @@ class HdrTimersTest {
         UnsupportedOperationException.class,
         () -> snapshots.add(new TimerSnapshot("other", 0, 0, 0, 0.0d, 0, 0, 0, 0, 0)));
   }
+
+  @Test
+  void previouslyObtainedSnapshotsDoNotChangeAfterRecording() {
+    Timers timers = HdrTimers.create();
+    Timer timer = timers.claim("service.call");
+    timer.record(10);
+    TimerSnapshot before = timers.snapshots().stream().findFirst().orElseThrow();
+
+    timer.record(20);
+    TimerSnapshot after = timers.snapshots().stream().findFirst().orElseThrow();
+
+    assertEquals(1, before.count());
+    assertEquals(10, before.max());
+    assertEquals(2, after.count());
+    assertEquals(20, after.max());
+  }
 }

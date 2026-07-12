@@ -1,0 +1,20 @@
+LatencyClocked
+Copyright (c) 2026
+
+This project is licensed under the Apache License, Version 2.0.
+
+This product includes the following third-party dependencies:
+
+------------------------------------------------------------------------
+HdrHistogram
+------------------------------------------------------------------------
+Developed by Gil Tene and contributors (https://github.com).
+Original code dedicated to the public domain (CC0 1.0) and dual-licensed
+under the BSD 2-Clause License. Distributed under the terms of the BSD 2-Clause License.
+
+------------------------------------------------------------------------
+OW2 ASM
+------------------------------------------------------------------------
+Copyright (c) 2000-2011 INRIA, France Telecom. All rights reserved.
+Distributed under the terms of the BSD 3-Clause License.
+Project site: https://asm.ow2.io/

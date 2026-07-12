@@ -6,45 +6,71 @@
 
     <groupId>com.ll.metrics</groupId>
     <artifactId>latency-clocked</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>1.0.0-SNAPSHOT</version>
     <packaging>pom</packaging>
+    <name>LatencyClocked</name>
+    <description>LatencyClocked is a small Java method profiling toolkit for build-time bytecode
+        instrumentation of `@Timed` methods. Designed to keep runtime overheads minimized.
+    </description>
+    <url>https://github.com/anthonyschiller/LatencyClocked</url>
+
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <id>antsch</id>
+            <name>Anthony Schiller</name>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:https://github.com/anthonyschiller/LatencyClockedlatency-clocked.git</connection>
+        <developerConnection>scm:https://github.com/anthonyschiller/LatencyClocked/latency-clocked.git</developerConnection>
+        <url>https://github.com/anthonyschiller/LatencyClocked/latency-clocked/source</url>
+        <tag>HEAD</tag>
+    </scm>
+
+    <issueManagement>
+        <system>GitHub Issues</system>
+        <url>https://github.com/anthonyschiller/LatencyClocked/issues</url>
+    </issueManagement>
 
     <modules>
         <module>model</module>
         <module>hdr</module>
         <module>core</module>
         <module>maven-plugin</module>
-        <module>latency-jmh</module>
+        <module>benchmarking-jmh</module>
+        <module>example-application</module>
     </modules>
 
     <properties>
+        <project.build.outputTimestamp>2026-01-01T00:00:00Z</project.build.outputTimestamp>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <checkstyle.version>3.6.0</checkstyle.version>
         <maven.compiler.release>25</maven.compiler.release>
+        <maven.jar.version>3.5.0</maven.jar.version>
+        <maven.javadoc.version>3.11.3</maven.javadoc.version>
+        <maven.release.version>3.1.1</maven.release.version>
+        <maven.source.version>3.3.1</maven.source.version>
         <jacoco.version>0.8.14</jacoco.version>
-        <hdrhistogram.version>2.2.2</hdrhistogram.version>
         <junit.jupiter.version>5.10.3</junit.jupiter.version>
         <log4j2.version>2.25.1</log4j2.version>
         <japicmp.version>0.23.1</japicmp.version>
         <maven.invoker.version>3.9.1</maven.invoker.version>
         <maven.surefire.version>3.5.6</maven.surefire.version>
-        <slf4j.version>2.0.17</slf4j.version>
         <spotbugs.version>4.10.2.0</spotbugs.version>
         <versions.maven.plugin.version>2.18.0</versions.maven.plugin.version>
     </properties>
 
     <dependencyManagement>
         <dependencies>
-            <dependency>
-                <groupId>org.slf4j</groupId>
-                <artifactId>slf4j-api</artifactId>
-                <version>${slf4j.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.hdrhistogram</groupId>
-                <artifactId>HdrHistogram</artifactId>
-                <version>${hdrhistogram.version}</version>
-            </dependency>
             <dependency>
                 <groupId>org.apache.logging.log4j</groupId>
                 <artifactId>log4j-slf4j2-impl</artifactId>
@@ -235,6 +261,51 @@
                     </execution>
                 </executions>
             </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <version>${maven.source.version}</version>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>jar-no-fork</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-release-plugin</artifactId>
+                <version>${maven.release.version}</version>
+                <configuration>
+                    <autoVersionSubmodules>true</autoVersionSubmodules>
+                    <tagNameFormat>v@{project.version}</tagNameFormat>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <version>${maven.javadoc.version}</version>
+                <configuration>
+                    <failOnError>true</failOnError>
+                    <quiet>true</quiet>
+                    <release>${maven.compiler.release}</release>
+                    <sourceFileExcludes>
+                        <sourceFileExclude>**/module-info.java</sourceFileExclude>
+                    </sourceFileExcludes>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>attach-javadocs</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
         <pluginManagement>
             <plugins>
@@ -250,6 +321,11 @@
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-surefire-plugin</artifactId>
                     <version>${maven.surefire.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-jar-plugin</artifactId>
+                    <version>${maven.jar.version}</version>
                 </plugin>
             </plugins>
         </pluginManagement>
@@ -282,7 +358,7 @@
         <profile>
             <id>api-compat</id>
             <properties>
-                <api.previous.version>1.0-SNAPSHOT</api.previous.version>
+                <api.previous.version>1.0.0-SNAPSHOT</api.previous.version>
             </properties>
             <build>
                 <plugins>

@@ -1,5 +1,14 @@
 ['module-one', 'module-two'].each { moduleName ->
-  def jar = new java.util.jar.JarFile(new File(basedir, "${moduleName}/target/${moduleName}-1.0-SNAPSHOT.jar"))
+  def targetDirectory = new File(basedir, "${moduleName}/target")
+  def jars = targetDirectory.listFiles().findAll {
+    it.name ==~ /${moduleName}-.*\.jar/ &&
+        !it.name.endsWith('-sources.jar') &&
+        !it.name.endsWith('-javadoc.jar') &&
+        !it.name.endsWith('-tests.jar')
+  }
+  assert jars.size() == 1
+
+  def jar = new java.util.jar.JarFile(jars[0])
   try {
     def entry = jar.getJarEntry('META-INF/latency-clocked/index')
     assert entry != null

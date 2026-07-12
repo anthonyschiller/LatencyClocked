@@ -6,7 +6,7 @@ import java.util.Collections;
 import java.util.List;
 
 /** Thread-safe in-memory timer implementation backed by summary statistics. */
-public final class InMemoryTimer implements Timer {
+final class InMemoryTimer implements Timer {
   private final List<Long> durations = new ArrayList<>();
 
   @Override

@@ -7,8 +7,8 @@ LatencyClocked timer field is not bound.
 
 Cause: generated timer fields are assigned during startup by `LatencyClocked.initialise(...)`.
 
-Fix: call `LatencyClocked.initialise()` or `LatencyClocked.initialise(timers)` before timed
-methods can run. For concurrent applications, use `LatencyClocked.initialisedThreadSafe()`.
+Fix: call `LatencyClocked.initialise()` or `LatencyClocked.initialise(timers)` before timed methods
+can run. For concurrent applications, use `LatencyClocked.initialisedThreadSafe()`.
 
 ## Plugin Not Configured In A Module
 

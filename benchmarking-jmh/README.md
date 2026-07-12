@@ -1,4 +1,4 @@
-# latency-jmh
+# benchmarking-jmh
 
 This module contains the JMH benchmark jar for LatencyClocked. It is intentionally isolated
 from the runtime modules so JMH, Micrometer, and AspectJ dependencies do not affect library
@@ -7,20 +7,20 @@ consumers.
 Build:
 
 ```shell
-mvn -pl latency-jmh -am clean package
+mvn -pl benchmarking-jmh -am clean package
 ```
 
 Run only the benchmark class:
 
 ```shell
-java -jar latency-jmh/target/benchmarks.jar \
+java -jar benchmarking-jmh/target/benchmarks.jar \
   "com.ll.metrics.latency.jmh.LatencyClockedBenchmark.*"
 ```
 
 Run with allocation/GC profiling:
 
 ```shell
-java -jar latency-jmh/target/benchmarks.jar \
+java -jar benchmarking-jmh/target/benchmarks.jar \
   "com.ll.metrics.latency.jmh.LatencyClockedBenchmark.*" \
   -prof gc
 ```
