@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.ll.metrics.latency.constants.LatencyClockedConstants;
-import com.ll.metrics.latency.maven.model.LatencyDescriptorEntry;
+import com.ll.metrics.latency.maven.model.TimedMethodDescriptorEntry;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
@@ -91,11 +91,11 @@ class AsmInstrumentedBytecodeVerificationTest {
   }
 
   private static void instrument(Path outputDirectory) throws IOException {
-    Map<Path, List<LatencyDescriptorEntry>> entries =
-        LatencyDescriptorGenerator.scan(outputDirectory);
-    LatencyDescriptorGenerator.injectTimerFields(entries);
-    LatencyDescriptorGenerator.writeDescriptor(
-        outputDirectory, entries.values().stream().flatMap(List::stream).toList());
+    Map<Path, List<TimedMethodDescriptorEntry>> timedMethodsByClassFile =
+        LatencyClockedInstrumenter.scan(outputDirectory);
+    LatencyClockedInstrumenter.instrument(timedMethodsByClassFile);
+    LatencyClockedInstrumenter.generateInstrumentedClassIndexFile(
+        outputDirectory, timedMethodsByClassFile.values().stream().flatMap(List::stream).toList());
   }
 
   private static MethodCalls methodCalls(Path outputDirectory, String methodName, String descriptor)

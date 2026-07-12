@@ -3,8 +3,8 @@ package com.ll.metrics.latency.maven;
 import com.ll.metrics.latency.constants.LatencyClockedConstants;
 import com.ll.metrics.latency.maven.asm.TimedClassAnalyser;
 import com.ll.metrics.latency.maven.asm.TimerFieldInjector;
-import com.ll.metrics.latency.maven.model.LatencyDescriptorEntry;
 import com.ll.metrics.latency.maven.model.TimedClassMetadata;
+import com.ll.metrics.latency.maven.model.TimedMethodDescriptorEntry;
 import com.ll.metrics.latency.maven.model.TimedMethodMetadata;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -20,30 +20,30 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Stream;
 
-final class LatencyDescriptorGenerator {
+final class LatencyClockedInstrumenter {
   private static final TimedClassAnalyser CLASS_ANALYSER =
       new TimedClassAnalyser(new TimerIdResolver());
   private static final TimerFieldInjector TIMER_FIELD_INJECTOR = new TimerFieldInjector();
 
-  private LatencyDescriptorGenerator() {}
+  private LatencyClockedInstrumenter() {}
 
-  static Map<Path, List<LatencyDescriptorEntry>> scan(Path outputDirectory) throws IOException {
+  static Map<Path, List<TimedMethodDescriptorEntry>> scan(Path outputDirectory) throws IOException {
     Objects.requireNonNull(outputDirectory, "outputDirectory");
 
-    Map<Path, List<LatencyDescriptorEntry>> descriptorsByClassFile = new LinkedHashMap<>();
+    Map<Path, List<TimedMethodDescriptorEntry>> timedMethodsByClassFile = new LinkedHashMap<>();
     for (Path classFile : classFiles(outputDirectory)) {
       TimedClassMetadata metadata = CLASS_ANALYSER.analyse(classFile);
-      List<LatencyDescriptorEntry> entries = descriptorEntries(metadata);
-      if (!entries.isEmpty()) {
-        descriptorsByClassFile.put(classFile, entries);
+      List<TimedMethodDescriptorEntry> timedMethods = timedMethodEntries(metadata);
+      if (!timedMethods.isEmpty()) {
+        timedMethodsByClassFile.put(classFile, timedMethods);
       }
     }
-    return descriptorsByClassFile;
+    return timedMethodsByClassFile;
   }
 
-  static InjectionResult injectTimerFields(
-      Map<Path, List<LatencyDescriptorEntry>> entriesByClassFile) throws IOException {
-    Objects.requireNonNull(entriesByClassFile, "entriesByClassFile");
+  static InjectionResult instrument(
+      Map<Path, List<TimedMethodDescriptorEntry>> timedMethodsByClassFile) throws IOException {
+    Objects.requireNonNull(timedMethodsByClassFile, "timedMethodsByClassFile");
 
     int injectedFields = 0;
     int skippedFields = 0;
@@ -51,7 +51,8 @@ final class LatencyDescriptorGenerator {
     int skippedBindMethods = 0;
     int instrumentedMethods = 0;
     int skippedInstrumentedMethods = 0;
-    for (Map.Entry<Path, List<LatencyDescriptorEntry>> classEntry : entriesByClassFile.entrySet()) {
+    for (Map.Entry<Path, List<TimedMethodDescriptorEntry>> classEntry :
+        timedMethodsByClassFile.entrySet()) {
       TimerFieldInjector.FieldInjectionResult result =
           TIMER_FIELD_INJECTOR.inject(classEntry.getKey(), classEntry.getValue());
       injectedFields += result.injectedFields();
@@ -70,35 +71,35 @@ final class LatencyDescriptorGenerator {
         skippedInstrumentedMethods);
   }
 
-  static void writeDescriptor(Path outputDirectory, List<LatencyDescriptorEntry> descriptors)
-      throws IOException {
-    writeIndex(outputDirectory, descriptors);
+  static void generateInstrumentedClassIndexFile(Path outputDirectory,
+      List<TimedMethodDescriptorEntry> timedMethods) throws IOException {
+    writeClassIndex(outputDirectory, timedMethods);
   }
 
-  static Path writeInstrumentationReport(
+  static Path writeInstrumentationReportToFile(
       Path reportDirectory,
-      Map<Path, List<LatencyDescriptorEntry>> entriesByClassFile,
+      Map<Path, List<TimedMethodDescriptorEntry>> timedMethodsByClassFile,
       InjectionResult injectionResult)
       throws IOException {
     Objects.requireNonNull(reportDirectory, "reportDirectory");
-    Objects.requireNonNull(entriesByClassFile, "entriesByClassFile");
+    Objects.requireNonNull(timedMethodsByClassFile, "timedMethodsByClassFile");
     Objects.requireNonNull(injectionResult, "injectionResult");
 
     Files.createDirectories(reportDirectory);
     Path report = reportDirectory.resolve("instrumentation-report.txt");
-    Files.write(report, instrumentationReport(entriesByClassFile, injectionResult));
+    Files.write(report, instrumentationReport(timedMethodsByClassFile, injectionResult));
     return report;
   }
 
-  private static List<LatencyDescriptorEntry> descriptorEntries(TimedClassMetadata metadata) {
+  private static List<TimedMethodDescriptorEntry> timedMethodEntries(TimedClassMetadata metadata) {
     return metadata.timedMethods().stream()
-        .map(method -> descriptorEntry(metadata.className(), method))
+        .map(method -> timedMethodEntry(metadata.className(), method))
         .toList();
   }
 
-  private static LatencyDescriptorEntry descriptorEntry(
+  private static TimedMethodDescriptorEntry timedMethodEntry(
       String className, TimedMethodMetadata method) {
-    return new LatencyDescriptorEntry(
+    return new TimedMethodDescriptorEntry(
         className,
         method.methodName(),
         method.methodDescriptor(),
@@ -122,17 +123,19 @@ final class LatencyDescriptorGenerator {
     }
   }
 
-  private static void writeIndex(
-      Path outputDirectory, Collection<LatencyDescriptorEntry> descriptors) throws IOException {
+  private static void writeClassIndex(
+      Path outputDirectory,
+      Collection<TimedMethodDescriptorEntry> timedMethods)
+      throws IOException {
     Objects.requireNonNull(outputDirectory, "outputDirectory");
-    Objects.requireNonNull(descriptors, "descriptors");
+    Objects.requireNonNull(timedMethods, "timedMethods");
 
     Path descriptorDirectory =
         outputDirectory
             .resolve(LatencyClockedConstants.DESCRIPTOR_ROOT)
             .resolve(LatencyClockedConstants.DESCRIPTOR_DIRECTORY);
     Path descriptor = descriptorDirectory.resolve(LatencyClockedConstants.DESCRIPTOR_FILE);
-    if (descriptors.isEmpty()) {
+    if (timedMethods.isEmpty()) {
       Files.deleteIfExists(descriptor);
       return;
     }
@@ -140,17 +143,21 @@ final class LatencyDescriptorGenerator {
     Files.createDirectories(descriptorDirectory);
 
     List<String> lines =
-        new LinkedHashSet<>(descriptors.stream().map(LatencyDescriptorEntry::className).toList())
+        new LinkedHashSet<>(
+                timedMethods.stream().map(TimedMethodDescriptorEntry::className).toList())
             .stream().toList();
     Files.write(descriptor, lines, StandardCharsets.UTF_8);
   }
 
   private static List<String> instrumentationReport(
-      Map<Path, List<LatencyDescriptorEntry>> entriesByClassFile, InjectionResult injectionResult) {
+      Map<Path, List<TimedMethodDescriptorEntry>> timedMethodsByClassFile,
+      InjectionResult injectionResult) {
     List<String> lines = new ArrayList<>();
     lines.add("LatencyClocked instrumentation report");
-    lines.add("classesWithTimedMethods=" + entriesByClassFile.size());
-    lines.add("timedMethods=" + entriesByClassFile.values().stream().mapToInt(List::size).sum());
+    lines.add("classesWithTimedMethods=" + timedMethodsByClassFile.size());
+    int timedMethodCount =
+        timedMethodsByClassFile.values().stream().mapToInt(List::size).sum();
+    lines.add("timedMethods=" + timedMethodCount);
     lines.add("injectedFields=" + injectionResult.injectedFields());
     lines.add("skippedFields=" + injectionResult.skippedFields());
     lines.add("injectedBindMethods=" + injectionResult.injectedBindMethods());
@@ -159,17 +166,18 @@ final class LatencyDescriptorGenerator {
     lines.add("skippedInstrumentedMethods=" + injectionResult.skippedInstrumentedMethods());
     lines.add("");
     lines.add("status|className|methodName|methodDescriptor|fieldName|timerId|classFile");
-    for (Map.Entry<Path, List<LatencyDescriptorEntry>> classEntry : entriesByClassFile.entrySet()) {
-      for (LatencyDescriptorEntry entry : classEntry.getValue()) {
+    for (Map.Entry<Path, List<TimedMethodDescriptorEntry>> classEntry :
+        timedMethodsByClassFile.entrySet()) {
+      for (TimedMethodDescriptorEntry timedMethod : classEntry.getValue()) {
         lines.add(
             String.join(
                 "|",
                 "instrumented",
-                entry.className(),
-                entry.methodName(),
-                entry.methodDescriptor(),
-                entry.fieldName(),
-                entry.timerId(),
+                timedMethod.className(),
+                timedMethod.methodName(),
+                timedMethod.methodDescriptor(),
+                timedMethod.fieldName(),
+                timedMethod.timerId(),
                 classEntry.getKey().toString()));
       }
     }

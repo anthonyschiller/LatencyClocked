@@ -1,6 +1,6 @@
 package com.ll.metrics.latency.maven.asm;
 
-import com.ll.metrics.latency.maven.model.LatencyDescriptorEntry;
+import com.ll.metrics.latency.maven.model.TimedMethodDescriptorEntry;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -22,21 +22,23 @@ import org.objectweb.asm.Opcodes;
 /** Injects generated timer fields and startup bind methods into compiled classes. */
 public final class TimerFieldInjector {
   /** Injects generated members and instruments timed method bodies in the supplied class file. */
-  public FieldInjectionResult inject(Path classFile, Collection<LatencyDescriptorEntry> entries)
-      throws IOException {
+  public FieldInjectionResult inject(
+      Path classFile, Collection<TimedMethodDescriptorEntry> timedMethods) throws IOException {
     Objects.requireNonNull(classFile, "classFile");
-    Objects.requireNonNull(entries, "entries");
+    Objects.requireNonNull(timedMethods, "timedMethods");
 
     byte[] classBytes = Files.readAllBytes(classFile);
     ClassReader reader = new ClassReader(classBytes);
-    Map<MethodKey, LatencyDescriptorEntry> entriesByMethod = entriesByMethod(entries);
-    InstrumentationMarkerScanner scanner = new InstrumentationMarkerScanner(entriesByMethod);
+    Map<MethodKey, TimedMethodDescriptorEntry> timedMethodsByMethod =
+        timedMethodsByMethod(timedMethods);
+    InstrumentationMarkerScanner scanner = new InstrumentationMarkerScanner(timedMethodsByMethod);
     reader.accept(scanner, ClassReader.SKIP_DEBUG);
 
     ClassWriter writer =
         new ClassWriter(reader, ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
     TimerFieldClassVisitor injector =
-        new TimerFieldClassVisitor(writer, entries, entriesByMethod, scanner.instrumentedMethods());
+        new TimerFieldClassVisitor(
+            writer, timedMethods, timedMethodsByMethod, scanner.instrumentedMethods());
     reader.accept(injector, ClassReader.EXPAND_FRAMES);
     if (injector.changed()) {
       Files.write(classFile, writer.toByteArray());
@@ -60,8 +62,8 @@ public final class TimerFieldInjector {
       int skippedInstrumentedMethods) {}
 
   private static final class TimerFieldClassVisitor extends ClassVisitor {
-    private final List<LatencyDescriptorEntry> entries;
-    private final Map<MethodKey, LatencyDescriptorEntry> entriesByMethod;
+    private final List<TimedMethodDescriptorEntry> timedMethods;
+    private final Map<MethodKey, TimedMethodDescriptorEntry> timedMethodsByMethod;
     private final Set<MethodKey> alreadyInstrumentedMethods;
     private final Set<String> requiredFields;
     private final Set<String> existingFields = new HashSet<>();
@@ -74,15 +76,17 @@ public final class TimerFieldInjector {
 
     private TimerFieldClassVisitor(
         ClassVisitor delegate,
-        Collection<LatencyDescriptorEntry> entries,
-        Map<MethodKey, LatencyDescriptorEntry> entriesByMethod,
+        Collection<TimedMethodDescriptorEntry> timedMethods,
+        Map<MethodKey, TimedMethodDescriptorEntry> timedMethodsByMethod,
         Set<MethodKey> alreadyInstrumentedMethods) {
       super(Opcodes.ASM9, delegate);
-      this.entries = List.copyOf(entries);
-      this.entriesByMethod = Map.copyOf(entriesByMethod);
+      this.timedMethods = List.copyOf(timedMethods);
+      this.timedMethodsByMethod = Map.copyOf(timedMethodsByMethod);
       this.alreadyInstrumentedMethods = Set.copyOf(alreadyInstrumentedMethods);
       requiredFields =
-          entries.stream().map(LatencyDescriptorEntry::fieldName).collect(Collectors.toSet());
+          timedMethods.stream()
+              .map(TimedMethodDescriptorEntry::fieldName)
+              .collect(Collectors.toSet());
     }
 
     @Override
@@ -113,8 +117,8 @@ public final class TimerFieldInjector {
       }
       MethodVisitor delegate = super.visitMethod(access, name, descriptor, signature, exceptions);
       MethodKey methodKey = new MethodKey(name, descriptor);
-      LatencyDescriptorEntry entry = entriesByMethod.get(methodKey);
-      if (entry == null || !isInstrumentable(access, name)) {
+      TimedMethodDescriptorEntry timedMethod = timedMethodsByMethod.get(methodKey);
+      if (timedMethod == null || !isInstrumentable(access, name)) {
         return delegate;
       }
       if (alreadyInstrumentedMethods.contains(methodKey)) {
@@ -123,19 +127,19 @@ public final class TimerFieldInjector {
       }
       instrumentedMethods++;
       return new TimedMethodInstrumenter(
-          delegate, access, name, descriptor, internalClassName, entry);
+          delegate, access, name, descriptor, internalClassName, timedMethod);
     }
 
     @Override
     public void visitEnd() {
-      for (LatencyDescriptorEntry entry : entries) {
-        if (existingFields.contains(entry.fieldName())) {
+      for (TimedMethodDescriptorEntry timedMethod : timedMethods) {
+        if (existingFields.contains(timedMethod.fieldName())) {
           continue;
         }
         FieldVisitor fieldVisitor =
             super.visitField(
                 Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC | Opcodes.ACC_SYNTHETIC,
-                entry.fieldName(),
+                timedMethod.fieldName(),
                 AsmConstants.TIMER_DESCRIPTOR,
                 null,
                 null);
@@ -143,10 +147,10 @@ public final class TimerFieldInjector {
           fieldVisitor.visitEnd();
         }
         injectedFields++;
-        existingFields.add(entry.fieldName());
+        existingFields.add(timedMethod.fieldName());
       }
       if (!existingBindMethod) {
-        BindMethodInjector.inject(cv, internalClassName, entries);
+        BindMethodInjector.inject(cv, internalClassName, timedMethods);
         injectedBindMethod = true;
       }
       super.visitEnd();
@@ -187,13 +191,14 @@ public final class TimerFieldInjector {
     }
   }
 
-  private static Map<MethodKey, LatencyDescriptorEntry> entriesByMethod(
-      Collection<LatencyDescriptorEntry> entries) {
-    Map<MethodKey, LatencyDescriptorEntry> entriesByMethod = new HashMap<>();
-    for (LatencyDescriptorEntry entry : entries) {
-      entriesByMethod.put(new MethodKey(entry.methodName(), entry.methodDescriptor()), entry);
+  private static Map<MethodKey, TimedMethodDescriptorEntry> timedMethodsByMethod(
+      Collection<TimedMethodDescriptorEntry> timedMethods) {
+    Map<MethodKey, TimedMethodDescriptorEntry> timedMethodsByMethod = new HashMap<>();
+    for (TimedMethodDescriptorEntry timedMethod : timedMethods) {
+      timedMethodsByMethod.put(
+          new MethodKey(timedMethod.methodName(), timedMethod.methodDescriptor()), timedMethod);
     }
-    return entriesByMethod;
+    return timedMethodsByMethod;
   }
 
   private static boolean isInstrumentable(int access, String methodName) {

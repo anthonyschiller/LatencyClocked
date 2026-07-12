@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.ll.metrics.latency.constants.LatencyClockedConstants;
-import com.ll.metrics.latency.maven.model.LatencyDescriptorEntry;
+import com.ll.metrics.latency.maven.model.TimedMethodDescriptorEntry;
 import com.ll.metrics.latency.maven.samples.SampleTimedClass;
 import com.ll.metrics.latency.timer.InMemoryTimers;
 import com.ll.metrics.latency.timer.Timer;
@@ -35,66 +35,70 @@ import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 
-class LatencyDescriptorGeneratorTest {
+class LatencyClockedInstrumenterTest {
   private static final String SAMPLE_CLASS_NAME = SampleTimedClass.class.getName();
 
   @Test
   void scanRejectsNullOutputDirectory() {
-    assertThrows(NullPointerException.class, () -> LatencyDescriptorGenerator.scan(null));
+    assertThrows(NullPointerException.class, () -> LatencyClockedInstrumenter.scan(null));
   }
 
   @Test
-  void scanReturnsDescriptorEntriesByClassFile() throws IOException {
+  void scanReturnsTimedMethodsByClassFile() throws IOException {
     Path outputDirectory = Path.of("target", "test-classes");
-    Map<Path, List<LatencyDescriptorEntry>> entries =
-        LatencyDescriptorGenerator.scan(outputDirectory);
+    Map<Path, List<TimedMethodDescriptorEntry>> timedMethodsByClassFile =
+        LatencyClockedInstrumenter.scan(outputDirectory);
     Path sampleClassFile = classFile(outputDirectory, SampleTimedClass.class);
 
-    assertTrue(entries.containsKey(sampleClassFile));
-    assertEquals(5, entries.get(sampleClassFile).size());
+    assertTrue(timedMethodsByClassFile.containsKey(sampleClassFile));
+    assertEquals(5, timedMethodsByClassFile.get(sampleClassFile).size());
     assertTrue(
-        entries.get(sampleClassFile).stream()
-            .allMatch(entry -> entry.className().equals(SAMPLE_CLASS_NAME)));
+        timedMethodsByClassFile.get(sampleClassFile).stream()
+            .allMatch(timedMethod -> timedMethod.className().equals(SAMPLE_CLASS_NAME)));
   }
 
   @Test
   void scanIncludesOnlyTimedMethods() throws IOException {
-    List<LatencyDescriptorEntry> entries =
-        entriesIn(LatencyDescriptorGenerator.scan(Path.of("target", "test-classes")));
+    List<TimedMethodDescriptorEntry> timedMethods =
+        timedMethodsIn(LatencyClockedInstrumenter.scan(Path.of("target", "test-classes")));
 
-    List<LatencyDescriptorEntry> sampleEntries =
-        entries.stream().filter(entry -> entry.className().equals(SAMPLE_CLASS_NAME)).toList();
+    List<TimedMethodDescriptorEntry> sampleTimedMethods =
+        timedMethods.stream()
+            .filter(timedMethod -> timedMethod.className().equals(SAMPLE_CLASS_NAME))
+            .toList();
 
-    assertEquals(5, sampleEntries.size());
+    assertEquals(5, sampleTimedMethods.size());
     assertTrue(
-        sampleEntries.stream()
-            .noneMatch(entry -> entry.timerId().startsWith(SAMPLE_CLASS_NAME + "#normalMethod")));
+        sampleTimedMethods.stream()
+            .noneMatch(
+                timedMethod ->
+                    timedMethod.timerId().startsWith(SAMPLE_CLASS_NAME + "#normalMethod")));
   }
 
   @Test
   void scanUsesGeneratedMethodIdForTimedMethods() throws IOException {
-    List<LatencyDescriptorEntry> entries =
-        entriesIn(LatencyDescriptorGenerator.scan(Path.of("target", "test-classes")));
+    List<TimedMethodDescriptorEntry> timedMethods =
+        timedMethodsIn(LatencyClockedInstrumenter.scan(Path.of("target", "test-classes")));
 
     assertTrue(
-        entries.stream()
+        timedMethods.stream()
             .anyMatch(
-                entry ->
-                    entry.className().equals(SAMPLE_CLASS_NAME)
-                        && entry
+                timedMethod ->
+                    timedMethod.className().equals(SAMPLE_CLASS_NAME)
+                        && timedMethod
                             .timerId()
                             .equals(SAMPLE_CLASS_NAME + "#timedMethodWithGeneratedId()V")));
   }
 
   @Test
   void scanAddsParameterTypesForOverloadedTimedMethods() throws IOException {
-    List<LatencyDescriptorEntry> entries =
-        entriesIn(LatencyDescriptorGenerator.scan(Path.of("target", "test-classes")));
+    List<TimedMethodDescriptorEntry> timedMethods =
+        timedMethodsIn(LatencyClockedInstrumenter.scan(Path.of("target", "test-classes")));
 
     Set<String> timerIds =
-        entries.stream()
-            .filter(entry -> entry.className().equals(SAMPLE_CLASS_NAME))
-            .map(LatencyDescriptorEntry::timerId)
+        timedMethods.stream()
+            .filter(timedMethod -> timedMethod.className().equals(SAMPLE_CLASS_NAME))
+            .map(TimedMethodDescriptorEntry::timerId)
             .collect(Collectors.toSet());
 
     assertTrue(timerIds.contains(SAMPLE_CLASS_NAME + "#overloaded(I)V"));
@@ -103,37 +107,41 @@ class LatencyDescriptorGeneratorTest {
 
   @Test
   void scanUsesSimpleDefaultTimerIdForNonOverloadedTimedMethod() throws IOException {
-    List<LatencyDescriptorEntry> entries =
-        entriesIn(LatencyDescriptorGenerator.scan(Path.of("target", "test-classes")));
+    List<TimedMethodDescriptorEntry> timedMethods =
+        timedMethodsIn(LatencyClockedInstrumenter.scan(Path.of("target", "test-classes")));
 
     assertTrue(
-        entries.stream()
+        timedMethods.stream()
             .anyMatch(
-                entry ->
-                    entry.className().equals(SAMPLE_CLASS_NAME)
-                        && entry.timerId().equals(SAMPLE_CLASS_NAME + "#timedMethod()V")));
+                timedMethod ->
+                    timedMethod.className().equals(SAMPLE_CLASS_NAME)
+                        && timedMethod.timerId().equals(SAMPLE_CLASS_NAME + "#timedMethod()V")));
   }
 
   @Test
   void scanIncludesTimedStaticMethods() throws IOException {
-    List<LatencyDescriptorEntry> entries =
-        entriesIn(LatencyDescriptorGenerator.scan(Path.of("target", "test-classes")));
+    List<TimedMethodDescriptorEntry> timedMethods =
+        timedMethodsIn(LatencyClockedInstrumenter.scan(Path.of("target", "test-classes")));
 
     assertTrue(
-        entries.stream()
+        timedMethods.stream()
             .anyMatch(
-                entry ->
-                    entry.className().equals(SAMPLE_CLASS_NAME)
-                        && entry.timerId().equals(SAMPLE_CLASS_NAME + "#staticTimedMethod()V")));
+                timedMethod ->
+                    timedMethod.className().equals(SAMPLE_CLASS_NAME)
+                        && timedMethod
+                            .timerId()
+                            .equals(SAMPLE_CLASS_NAME + "#staticTimedMethod()V")));
   }
 
   @Test
   void generatedTimerFieldNamesAreSequenced() throws IOException {
-    List<LatencyDescriptorEntry> entries =
-        entriesIn(LatencyDescriptorGenerator.scan(Path.of("target", "test-classes")));
+    List<TimedMethodDescriptorEntry> timedMethods =
+        timedMethodsIn(LatencyClockedInstrumenter.scan(Path.of("target", "test-classes")));
 
-    List<LatencyDescriptorEntry> sampleEntries =
-        entries.stream().filter(entry -> entry.className().equals(SAMPLE_CLASS_NAME)).toList();
+    List<TimedMethodDescriptorEntry> sampleTimedMethods =
+        timedMethods.stream()
+            .filter(timedMethod -> timedMethod.className().equals(SAMPLE_CLASS_NAME))
+            .toList();
 
     assertEquals(
         Set.of(
@@ -142,30 +150,32 @@ class LatencyDescriptorGeneratorTest {
             "__latency_clocked_timer_2",
             "__latency_clocked_timer_3",
             "__latency_clocked_timer_4"),
-        sampleEntries.stream().map(LatencyDescriptorEntry::fieldName).collect(Collectors.toSet()));
+        sampleTimedMethods.stream()
+            .map(TimedMethodDescriptorEntry::fieldName)
+            .collect(Collectors.toSet()));
   }
 
   @Test
-  void writeDescriptorWritesTimerIndex(@TempDir Path outputDirectory) throws IOException {
-    List<LatencyDescriptorEntry> entries =
+  void writeIndexWritesTimerIndex(@TempDir Path outputDirectory) throws IOException {
+    List<TimedMethodDescriptorEntry> timedMethods =
         List.of(
-            new LatencyDescriptorEntry(
+            new TimedMethodDescriptorEntry(
                 "com.example.Service", "call", "()V", "__latency_clocked_timer_0", "id"));
 
-    LatencyDescriptorGenerator.writeDescriptor(outputDirectory, entries);
+    LatencyClockedInstrumenter.generateInstrumentedClassIndexFile(outputDirectory, timedMethods);
 
     Path descriptor = descriptor(outputDirectory);
     assertEquals("com.example.Service", Files.readString(descriptor).trim());
   }
 
   @Test
-  void writeDescriptorDeduplicatesClassNames(@TempDir Path outputDirectory) throws IOException {
-    LatencyDescriptorGenerator.writeDescriptor(
+  void writeIndexDeduplicatesClassNames(@TempDir Path outputDirectory) throws IOException {
+    LatencyClockedInstrumenter.generateInstrumentedClassIndexFile(
         outputDirectory,
         List.of(
-            new LatencyDescriptorEntry(
+            new TimedMethodDescriptorEntry(
                 "com.example.Service", "call", "()V", "__latency_clocked_timer_0", "a"),
-            new LatencyDescriptorEntry(
+            new TimedMethodDescriptorEntry(
                 "com.example.Service", "other", "()V", "__latency_clocked_timer_1", "b")));
 
     assertEquals("com.example.Service", Files.readString(descriptor(outputDirectory)).trim());
@@ -174,7 +184,7 @@ class LatencyDescriptorGeneratorTest {
   @Test
   void generatedIndexIsIncludedInPackagedJar(@TempDir Path outputDirectory) throws IOException {
     copyClassToOutputDirectory(SampleTimedClass.class, outputDirectory);
-    scanInjectAndWriteDescriptor(outputDirectory);
+    scanInstrumentAndWriteIndex(outputDirectory);
     Path jar = outputDirectory.resolve("sample.jar");
 
     try (JarOutputStream outputStream = new JarOutputStream(Files.newOutputStream(jar))) {
@@ -195,21 +205,21 @@ class LatencyDescriptorGeneratorTest {
   }
 
   @Test
-  void writeDescriptorSkipsEmptyIndex(@TempDir Path outputDirectory) throws IOException {
-    LatencyDescriptorGenerator.writeDescriptor(outputDirectory, List.of());
+  void writeIndexSkipsEmptyIndex(@TempDir Path outputDirectory) throws IOException {
+    LatencyClockedInstrumenter.generateInstrumentedClassIndexFile(outputDirectory, List.of());
 
     Path descriptor = descriptor(outputDirectory);
     assertTrue(Files.notExists(descriptor));
   }
 
   @Test
-  void writeDescriptorRemovesStaleIndexWhenNoEntriesRemain(@TempDir Path outputDirectory)
+  void writeIndexRemovesStaleIndexWhenNoTimedMethodsRemain(@TempDir Path outputDirectory)
       throws IOException {
     Path descriptor = descriptor(outputDirectory);
     Files.createDirectories(descriptor.getParent());
     Files.writeString(descriptor, "stale");
 
-    LatencyDescriptorGenerator.writeDescriptor(outputDirectory, List.of());
+    LatencyClockedInstrumenter.generateInstrumentedClassIndexFile(outputDirectory, List.of());
 
     assertTrue(Files.notExists(descriptor));
   }
@@ -218,11 +228,12 @@ class LatencyDescriptorGeneratorTest {
   void injectsTimerFieldForOneTimedMethod(@TempDir Path outputDirectory) throws IOException {
     copyClassToOutputDirectory(SampleTimedClass.class, outputDirectory);
 
-    List<LatencyDescriptorEntry> entries = scanInjectAndWriteDescriptor(outputDirectory);
+    List<TimedMethodDescriptorEntry> timedMethods = scanInstrumentAndWriteIndex(outputDirectory);
 
-    assertEquals(5, entries.size());
-    LatencyDescriptorEntry entry = entries.getFirst();
-    FieldInfo field = requiredField(outputDirectory, SampleTimedClass.class, entry.fieldName());
+    assertEquals(5, timedMethods.size());
+    TimedMethodDescriptorEntry timedMethod = timedMethods.getFirst();
+    FieldInfo field =
+        requiredField(outputDirectory, SampleTimedClass.class, timedMethod.fieldName());
     assertEquals("__latency_clocked_timer_0", field.name());
     assertTrue(field.isStatic());
     assertTrue(field.isSynthetic());
@@ -235,9 +246,9 @@ class LatencyDescriptorGeneratorTest {
   void injectsTimerFieldsForMultipleTimedMethods(@TempDir Path outputDirectory) throws IOException {
     copyClassToOutputDirectory(SampleTimedClass.class, outputDirectory);
 
-    List<LatencyDescriptorEntry> entries = scanInjectAndWriteDescriptor(outputDirectory);
+    List<TimedMethodDescriptorEntry> timedMethods = scanInstrumentAndWriteIndex(outputDirectory);
 
-    assertEquals(5, entries.size());
+    assertEquals(5, timedMethods.size());
     Set<String> fieldNames =
         fields(outputDirectory, SampleTimedClass.class).stream()
             .map(FieldInfo::name)
@@ -255,15 +266,17 @@ class LatencyDescriptorGeneratorTest {
   void injectsTimerFieldForStaticTimedMethod(@TempDir Path outputDirectory) throws IOException {
     copyClassToOutputDirectory(SampleTimedClass.class, outputDirectory);
 
-    List<LatencyDescriptorEntry> entries = scanInjectAndWriteDescriptor(outputDirectory);
+    List<TimedMethodDescriptorEntry> timedMethods = scanInstrumentAndWriteIndex(outputDirectory);
 
-    LatencyDescriptorEntry staticEntry =
-        entries.stream()
-        .filter(entry -> entry.timerId().equals(SAMPLE_CLASS_NAME + "#staticTimedMethod()V"))
+    TimedMethodDescriptorEntry staticTimedMethod =
+        timedMethods.stream()
+            .filter(
+                timedMethod ->
+                    timedMethod.timerId().equals(SAMPLE_CLASS_NAME + "#staticTimedMethod()V"))
             .findFirst()
             .orElseThrow();
     FieldInfo field =
-        requiredField(outputDirectory, SampleTimedClass.class, staticEntry.fieldName());
+        requiredField(outputDirectory, SampleTimedClass.class, staticTimedMethod.fieldName());
     assertTrue(field.isStatic());
     assertEquals(Type.getDescriptor(Timer.class), field.descriptor());
   }
@@ -272,7 +285,7 @@ class LatencyDescriptorGeneratorTest {
   void injectsGeneratedBindMethod(@TempDir Path outputDirectory) throws IOException {
     copyClassToOutputDirectory(SampleTimedClass.class, outputDirectory);
 
-    scanInjectAndWriteDescriptor(outputDirectory);
+    scanInstrumentAndWriteIndex(outputDirectory);
 
     MethodInfo method =
         requiredMethod(outputDirectory, SampleTimedClass.class, "__latency_clocked$bind");
@@ -285,8 +298,8 @@ class LatencyDescriptorGeneratorTest {
   void generatedBindMethodAssignsTimerFields(@TempDir Path outputDirectory) throws Exception {
     copyClassToOutputDirectory(SampleTimedClass.class, outputDirectory);
 
-    List<LatencyDescriptorEntry> entries = scanInjectAndWriteDescriptor(outputDirectory);
-    LatencyDescriptorEntry entry = entries.getFirst();
+    List<TimedMethodDescriptorEntry> timedMethods = scanInstrumentAndWriteIndex(outputDirectory);
+    TimedMethodDescriptorEntry timedMethod = timedMethods.getFirst();
     Class<?> instrumentedClass = loadInstrumentedClass(outputDirectory, SampleTimedClass.class);
     Timers timers = InMemoryTimers.create();
 
@@ -294,22 +307,22 @@ class LatencyDescriptorGeneratorTest {
     bindMethod.setAccessible(true);
     bindMethod.invoke(null, timers);
 
-    Field field = instrumentedClass.getDeclaredField(entry.fieldName());
+    Field field = instrumentedClass.getDeclaredField(timedMethod.fieldName());
     field.setAccessible(true);
-    assertEquals(timers.claim(entry.timerId()), field.get(null));
+    assertEquals(timers.claim(timedMethod.timerId()), field.get(null));
   }
 
   @Test
   void injectingTimerFieldsAndBindMethodIsIdempotent(@TempDir Path outputDirectory)
       throws IOException {
     copyClassToOutputDirectory(SampleTimedClass.class, outputDirectory);
-    Map<Path, List<LatencyDescriptorEntry>> entries =
-        LatencyDescriptorGenerator.scan(outputDirectory);
+    Map<Path, List<TimedMethodDescriptorEntry>> timedMethodsByClassFile =
+        LatencyClockedInstrumenter.scan(outputDirectory);
 
-    LatencyDescriptorGenerator.InjectionResult firstInjection =
-        LatencyDescriptorGenerator.injectTimerFields(entries);
-    LatencyDescriptorGenerator.InjectionResult secondInjection =
-        LatencyDescriptorGenerator.injectTimerFields(entries);
+    LatencyClockedInstrumenter.InjectionResult firstInjection =
+        LatencyClockedInstrumenter.instrument(timedMethodsByClassFile);
+    LatencyClockedInstrumenter.InjectionResult secondInjection =
+        LatencyClockedInstrumenter.instrument(timedMethodsByClassFile);
 
     assertEquals(5, firstInjection.injectedFields());
     assertEquals(0, firstInjection.skippedFields());
@@ -331,20 +344,20 @@ class LatencyDescriptorGeneratorTest {
             .count());
   }
 
-  private static List<LatencyDescriptorEntry> scanInjectAndWriteDescriptor(Path outputDirectory)
+  private static List<TimedMethodDescriptorEntry> scanInstrumentAndWriteIndex(Path outputDirectory)
       throws IOException {
-    Map<Path, List<LatencyDescriptorEntry>> entries =
-        LatencyDescriptorGenerator.scan(outputDirectory);
-    LatencyDescriptorGenerator.injectTimerFields(entries);
-    List<LatencyDescriptorEntry> descriptors =
-        entries.values().stream().flatMap(List::stream).toList();
-    LatencyDescriptorGenerator.writeDescriptor(outputDirectory, descriptors);
-    return entriesIn(entries);
+    Map<Path, List<TimedMethodDescriptorEntry>> timedMethodsByClassFile =
+        LatencyClockedInstrumenter.scan(outputDirectory);
+    LatencyClockedInstrumenter.instrument(timedMethodsByClassFile);
+    List<TimedMethodDescriptorEntry> timedMethods =
+        timedMethodsByClassFile.values().stream().flatMap(List::stream).toList();
+    LatencyClockedInstrumenter.generateInstrumentedClassIndexFile(outputDirectory, timedMethods);
+    return timedMethodsIn(timedMethodsByClassFile);
   }
 
-  private static List<LatencyDescriptorEntry> entriesIn(
-      Map<Path, List<LatencyDescriptorEntry>> entriesByClassFile) {
-    return entriesByClassFile.values().stream().flatMap(List::stream).toList();
+  private static List<TimedMethodDescriptorEntry> timedMethodsIn(
+      Map<Path, List<TimedMethodDescriptorEntry>> timedMethodsByClassFile) {
+    return timedMethodsByClassFile.values().stream().flatMap(List::stream).toList();
   }
 
   private static void copyClassToOutputDirectory(Class<?> sourceClass, Path outputDirectory)
@@ -460,7 +473,7 @@ class LatencyDescriptorGeneratorTest {
     private final byte[] classBytes;
 
     private SingleClassLoader(String className, byte[] classBytes) {
-      super(LatencyDescriptorGeneratorTest.class.getClassLoader());
+      super(LatencyClockedInstrumenterTest.class.getClassLoader());
       this.className = className;
       this.classBytes = classBytes.clone();
     }

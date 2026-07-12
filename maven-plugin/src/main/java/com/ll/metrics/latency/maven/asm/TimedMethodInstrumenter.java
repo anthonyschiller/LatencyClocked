@@ -1,6 +1,6 @@
 package com.ll.metrics.latency.maven.asm;
 
-import com.ll.metrics.latency.maven.model.LatencyDescriptorEntry;
+import com.ll.metrics.latency.maven.model.TimedMethodDescriptorEntry;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
@@ -9,7 +9,7 @@ import org.objectweb.asm.commons.AdviceAdapter;
 
 final class TimedMethodInstrumenter extends AdviceAdapter {
   private final String internalClassName;
-  private final LatencyDescriptorEntry entry;
+  private final TimedMethodDescriptorEntry timedMethod;
   private int startLocal;
 
   TimedMethodInstrumenter(
@@ -18,10 +18,10 @@ final class TimedMethodInstrumenter extends AdviceAdapter {
       String name,
       String descriptor,
       String internalClassName,
-      LatencyDescriptorEntry entry) {
+      TimedMethodDescriptorEntry timedMethod) {
     super(Opcodes.ASM9, delegate, access, name, descriptor);
     this.internalClassName = internalClassName;
-    this.entry = entry;
+    this.timedMethod = timedMethod;
   }
 
   @Override
@@ -46,7 +46,10 @@ final class TimedMethodInstrumenter extends AdviceAdapter {
     invokeStatic(AsmConstants.LATENCY_CLOCKED_TYPE, AsmConstants.ENABLED);
     visitJumpInsn(Opcodes.IFEQ, skip);
     visitFieldInsn(
-        Opcodes.GETSTATIC, internalClassName, entry.fieldName(), AsmConstants.TIMER_DESCRIPTOR);
+        Opcodes.GETSTATIC,
+        internalClassName,
+        timedMethod.fieldName(),
+        AsmConstants.TIMER_DESCRIPTOR);
     ensureTimerIsBound();
     invokeStatic(AsmConstants.SYSTEM_TYPE, AsmConstants.NANO_TIME);
     loadLocal(startLocal, Type.LONG_TYPE);
@@ -66,12 +69,12 @@ final class TimedMethodInstrumenter extends AdviceAdapter {
 
   private String uninitialisedTimerMessage() {
     return "LatencyClocked timer field "
-        + entry.fieldName()
+        + timedMethod.fieldName()
         + " for "
-        + entry.className()
+        + timedMethod.className()
         + "#"
-        + entry.methodName()
-        + entry.methodDescriptor()
+        + timedMethod.methodName()
+        + timedMethod.methodDescriptor()
         + " is not bound. Call LatencyClocked.initialise(...) before invoking @Timed methods "
         + "and ensure latency-clocked:scan runs for this module.";
   }

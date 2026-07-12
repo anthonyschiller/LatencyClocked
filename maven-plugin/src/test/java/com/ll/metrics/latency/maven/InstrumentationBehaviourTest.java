@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.ll.metrics.latency.constants.LatencyClockedConstants;
 import com.ll.metrics.latency.core.LatencyClocked;
-import com.ll.metrics.latency.maven.model.LatencyDescriptorEntry;
+import com.ll.metrics.latency.maven.model.TimedMethodDescriptorEntry;
 import com.ll.metrics.latency.snapshot.TimerSnapshot;
 import com.ll.metrics.latency.timer.InMemoryTimers;
 import com.ll.metrics.latency.timer.Timers;
@@ -360,13 +360,13 @@ class InstrumentationBehaviourTest {
   }
 
   private static InstrumentationResult instrument(Path outputDirectory) throws IOException {
-    Map<Path, List<LatencyDescriptorEntry>> entries =
-        LatencyDescriptorGenerator.scan(outputDirectory);
-    LatencyDescriptorGenerator.InjectionResult injectionResult =
-        LatencyDescriptorGenerator.injectTimerFields(entries);
-    LatencyDescriptorGenerator.writeDescriptor(
-        outputDirectory, entries.values().stream().flatMap(List::stream).toList());
-    return new InstrumentationResult(entries, injectionResult);
+    Map<Path, List<TimedMethodDescriptorEntry>> timedMethodsByClassFile =
+        LatencyClockedInstrumenter.scan(outputDirectory);
+    LatencyClockedInstrumenter.InjectionResult injectionResult =
+        LatencyClockedInstrumenter.instrument(timedMethodsByClassFile);
+    LatencyClockedInstrumenter.generateInstrumentedClassIndexFile(
+        outputDirectory, timedMethodsByClassFile.values().stream().flatMap(List::stream).toList());
+    return new InstrumentationResult(timedMethodsByClassFile, injectionResult);
   }
 
   private static RuntimeFixture load(Path outputDirectory) throws Exception {
@@ -455,8 +455,8 @@ class InstrumentationBehaviourTest {
   }
 
   private record InstrumentationResult(
-      Map<Path, List<LatencyDescriptorEntry>> entries,
-      LatencyDescriptorGenerator.InjectionResult injectionResult) {}
+      Map<Path, List<TimedMethodDescriptorEntry>> timedMethodsByClassFile,
+      LatencyClockedInstrumenter.InjectionResult injectionResult) {}
 
   private record RuntimeFixture(
       URLClassLoader classLoader,

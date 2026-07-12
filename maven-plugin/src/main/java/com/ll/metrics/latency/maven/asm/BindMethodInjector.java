@@ -1,6 +1,6 @@
 package com.ll.metrics.latency.maven.asm;
 
-import com.ll.metrics.latency.maven.model.LatencyDescriptorEntry;
+import com.ll.metrics.latency.maven.model.TimedMethodDescriptorEntry;
 import java.util.Collection;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.MethodVisitor;
@@ -10,7 +10,9 @@ final class BindMethodInjector {
   private BindMethodInjector() {}
 
   static void inject(
-      ClassVisitor visitor, String internalClassName, Collection<LatencyDescriptorEntry> entries) {
+      ClassVisitor visitor,
+      String internalClassName,
+      Collection<TimedMethodDescriptorEntry> timedMethods) {
     MethodVisitor methodVisitor =
         visitor.visitMethod(
             Opcodes.ACC_STATIC | Opcodes.ACC_SYNTHETIC,
@@ -19,9 +21,9 @@ final class BindMethodInjector {
             null,
             null);
     methodVisitor.visitCode();
-    for (LatencyDescriptorEntry entry : entries) {
+    for (TimedMethodDescriptorEntry timedMethod : timedMethods) {
       methodVisitor.visitVarInsn(Opcodes.ALOAD, 0);
-      methodVisitor.visitLdcInsn(entry.timerId());
+      methodVisitor.visitLdcInsn(timedMethod.timerId());
       methodVisitor.visitMethodInsn(
           Opcodes.INVOKEINTERFACE,
           AsmConstants.TIMERS_INTERNAL_NAME,
@@ -29,7 +31,10 @@ final class BindMethodInjector {
           "(Ljava/lang/String;)" + AsmConstants.TIMER_DESCRIPTOR,
           true);
       methodVisitor.visitFieldInsn(
-          Opcodes.PUTSTATIC, internalClassName, entry.fieldName(), AsmConstants.TIMER_DESCRIPTOR);
+          Opcodes.PUTSTATIC,
+          internalClassName,
+          timedMethod.fieldName(),
+          AsmConstants.TIMER_DESCRIPTOR);
     }
     methodVisitor.visitInsn(Opcodes.RETURN);
     methodVisitor.visitMaxs(0, 0);

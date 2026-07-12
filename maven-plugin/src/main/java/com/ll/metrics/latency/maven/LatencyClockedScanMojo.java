@@ -1,6 +1,6 @@
 package com.ll.metrics.latency.maven;
 
-import com.ll.metrics.latency.maven.model.LatencyDescriptorEntry;
+import com.ll.metrics.latency.maven.model.TimedMethodDescriptorEntry;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -27,19 +27,20 @@ public final class LatencyClockedScanMojo extends AbstractMojo {
   @Override
   public void execute() throws MojoExecutionException {
     try {
-      Map<Path, List<LatencyDescriptorEntry>> entries =
-          LatencyDescriptorGenerator.scan(outputDirectory.toPath());
-      LatencyDescriptorGenerator.InjectionResult injectionResult =
-          LatencyDescriptorGenerator.injectTimerFields(entries);
-      List<LatencyDescriptorEntry> descriptors =
-          entries.values().stream().flatMap(List::stream).toList();
-      LatencyDescriptorGenerator.writeDescriptor(outputDirectory.toPath(), descriptors);
+      Map<Path, List<TimedMethodDescriptorEntry>> timedMethodsByClassFile =
+          LatencyClockedInstrumenter.scan(outputDirectory.toPath());
+      LatencyClockedInstrumenter.InjectionResult injectionResult =
+          LatencyClockedInstrumenter.instrument(timedMethodsByClassFile);
+      List<TimedMethodDescriptorEntry> timedMethods =
+          timedMethodsByClassFile.values().stream().flatMap(List::stream).toList();
+      LatencyClockedInstrumenter.generateInstrumentedClassIndexFile(outputDirectory.toPath(),
+              timedMethods);
       Path report =
-          LatencyDescriptorGenerator.writeInstrumentationReport(
-              reportDirectory.toPath(), entries, injectionResult);
-      logDescriptorDetails(entries);
-      int entryCount = entries.values().stream().mapToInt(List::size).sum();
-      getLog().info("Generated " + entryCount + " latency descriptor entries.");
+          LatencyClockedInstrumenter.writeInstrumentationReportToFile(
+              reportDirectory.toPath(), timedMethodsByClassFile, injectionResult);
+      logTimedMethodDetails(timedMethodsByClassFile);
+      int timedMethodCount = timedMethodsByClassFile.values().stream().mapToInt(List::size).sum();
+      getLog().info("Discovered " + timedMethodCount + " timed methods.");
       getLog().info("Wrote latency instrumentation report to " + report);
       getLog()
           .info(
@@ -65,14 +66,16 @@ public final class LatencyClockedScanMojo extends AbstractMojo {
     } catch (IllegalArgumentException e) {
       throw new MojoExecutionException(e.getMessage(), e);
     } catch (IOException e) {
-      throw new MojoExecutionException("Failed to generate latency descriptor index", e);
+      throw new MojoExecutionException("Failed to instrument latency-clocked classes", e);
     }
   }
 
-  private void logDescriptorDetails(Map<Path, List<LatencyDescriptorEntry>> entries) {
+  private void logTimedMethodDetails(
+      Map<Path, List<TimedMethodDescriptorEntry>> timedMethodsByClassFile) {
     logDetail("Scanned " + outputDirectory.toPath() + " for latency-clocked class files.");
-    logDetail("Found " + entries.size() + " classes containing @Timed methods.");
-    for (Map.Entry<Path, List<LatencyDescriptorEntry>> classEntry : entries.entrySet()) {
+    logDetail("Found " + timedMethodsByClassFile.size() + " classes containing @Timed methods.");
+    for (Map.Entry<Path, List<TimedMethodDescriptorEntry>> classEntry :
+        timedMethodsByClassFile.entrySet()) {
       logDetail(
           "Class "
               + classEntry.getValue().getFirst().className()
@@ -80,17 +83,17 @@ public final class LatencyClockedScanMojo extends AbstractMojo {
               + classEntry.getValue().size()
               + " timed methods in "
               + classEntry.getKey());
-      for (LatencyDescriptorEntry entry : classEntry.getValue()) {
+      for (TimedMethodDescriptorEntry timedMethod : classEntry.getValue()) {
         logDetail(
             "Instrumented "
-                + entry.className()
+                + timedMethod.className()
                 + "#"
-                + entry.methodName()
-                + entry.methodDescriptor()
+                + timedMethod.methodName()
+                + timedMethod.methodDescriptor()
                 + " -> "
-                + entry.timerId()
+                + timedMethod.timerId()
                 + " using "
-                + entry.fieldName());
+                + timedMethod.fieldName());
       }
     }
   }

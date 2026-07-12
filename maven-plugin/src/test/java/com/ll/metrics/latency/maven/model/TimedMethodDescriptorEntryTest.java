@@ -4,12 +4,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.junit.jupiter.api.Test;
 
-class LatencyDescriptorEntryTest {
+class TimedMethodDescriptorEntryTest {
   @Test
   void rejectsNullClassName() {
     assertThrows(
         NullPointerException.class,
-        () -> new LatencyDescriptorEntry(null, "call", "()V", "__latency_clocked_timer_0", "id"));
+        () ->
+            new TimedMethodDescriptorEntry(
+                null, "call", "()V", "__latency_clocked_timer_0", "id"));
   }
 
   @Test
@@ -17,7 +19,7 @@ class LatencyDescriptorEntryTest {
     assertThrows(
         NullPointerException.class,
         () ->
-            new LatencyDescriptorEntry(
+            new TimedMethodDescriptorEntry(
                 "com.example.Service", null, "()V", "__latency_clocked_timer_0", "id"));
   }
 
@@ -26,7 +28,7 @@ class LatencyDescriptorEntryTest {
     assertThrows(
         NullPointerException.class,
         () ->
-            new LatencyDescriptorEntry(
+            new TimedMethodDescriptorEntry(
                 "com.example.Service", "call", null, "__latency_clocked_timer_0", "id"));
   }
 
@@ -34,7 +36,7 @@ class LatencyDescriptorEntryTest {
   void rejectsNullFieldName() {
     assertThrows(
         NullPointerException.class,
-        () -> new LatencyDescriptorEntry("com.example.Service", "call", "()V", null, "id"));
+        () -> new TimedMethodDescriptorEntry("com.example.Service", "call", "()V", null, "id"));
   }
 
   @Test
@@ -42,7 +44,7 @@ class LatencyDescriptorEntryTest {
     assertThrows(
         NullPointerException.class,
         () ->
-            new LatencyDescriptorEntry(
+            new TimedMethodDescriptorEntry(
                 "com.example.Service", "call", "()V", "__latency_clocked_timer_0", null));
   }
 }

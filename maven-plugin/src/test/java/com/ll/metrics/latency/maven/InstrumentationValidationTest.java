@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.ll.metrics.latency.maven.model.LatencyDescriptorEntry;
+import com.ll.metrics.latency.maven.model.TimedMethodDescriptorEntry;
 import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -17,7 +17,7 @@ class InstrumentationValidationTest {
 
     IllegalArgumentException exception =
         assertThrows(
-            IllegalArgumentException.class, () -> LatencyDescriptorGenerator.scan(outputDirectory));
+            IllegalArgumentException.class, () -> LatencyClockedInstrumenter.scan(outputDirectory));
 
     assertUnsupportedMessage(
         exception,
@@ -32,7 +32,7 @@ class InstrumentationValidationTest {
 
     IllegalArgumentException exception =
         assertThrows(
-            IllegalArgumentException.class, () -> LatencyDescriptorGenerator.scan(outputDirectory));
+            IllegalArgumentException.class, () -> LatencyClockedInstrumenter.scan(outputDirectory));
 
     assertUnsupportedMessage(
         exception,
@@ -47,7 +47,7 @@ class InstrumentationValidationTest {
 
     IllegalArgumentException exception =
         assertThrows(
-            IllegalArgumentException.class, () -> LatencyDescriptorGenerator.scan(outputDirectory));
+            IllegalArgumentException.class, () -> LatencyClockedInstrumenter.scan(outputDirectory));
 
     assertUnsupportedMessage(
         exception,
@@ -62,7 +62,7 @@ class InstrumentationValidationTest {
 
     IllegalArgumentException exception =
         assertThrows(
-            IllegalArgumentException.class, () -> LatencyDescriptorGenerator.scan(outputDirectory));
+            IllegalArgumentException.class, () -> LatencyClockedInstrumenter.scan(outputDirectory));
 
     assertUnsupportedMessage(
         exception,
@@ -75,17 +75,18 @@ class InstrumentationValidationTest {
   void scanSkipsCompilerGeneratedBridgeMethods(@TempDir Path outputDirectory) throws Exception {
     GoldenFixtureCompiler.compile(outputDirectory, "GenericBridgeTimedSamples.java");
 
-    List<LatencyDescriptorEntry> entries =
-        LatencyDescriptorGenerator.scan(outputDirectory).values().stream()
+    List<TimedMethodDescriptorEntry> timedMethods =
+        LatencyClockedInstrumenter.scan(outputDirectory).values().stream()
             .flatMap(List::stream)
             .toList();
 
-    assertEquals(1, entries.size());
+    assertEquals(1, timedMethods.size());
     assertEquals(
         "golden.GenericBridgeTimedSamples$StringHandler#handle"
             + "(Ljava/lang/String;)Ljava/lang/String;",
-        entries.getFirst().timerId());
-    assertEquals("(Ljava/lang/String;)Ljava/lang/String;", entries.getFirst().methodDescriptor());
+        timedMethods.getFirst().timerId());
+    assertEquals(
+        "(Ljava/lang/String;)Ljava/lang/String;", timedMethods.getFirst().methodDescriptor());
   }
 
   private static void assertUnsupportedMessage(

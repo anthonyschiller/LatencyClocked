@@ -1,6 +1,6 @@
 package com.ll.metrics.latency.maven.asm;
 
-import com.ll.metrics.latency.maven.model.LatencyDescriptorEntry;
+import com.ll.metrics.latency.maven.model.TimedMethodDescriptorEntry;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
@@ -10,13 +10,13 @@ import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
 final class InstrumentationMarkerScanner extends ClassVisitor {
-  private final Map<MethodKey, LatencyDescriptorEntry> entriesByMethod;
+  private final Map<MethodKey, TimedMethodDescriptorEntry> timedMethodsByMethod;
   private final Set<MethodKey> instrumentedMethods = new HashSet<>();
   private String internalClassName;
 
-  InstrumentationMarkerScanner(Map<MethodKey, LatencyDescriptorEntry> entriesByMethod) {
+  InstrumentationMarkerScanner(Map<MethodKey, TimedMethodDescriptorEntry> timedMethodsByMethod) {
     super(Opcodes.ASM9);
-    this.entriesByMethod = entriesByMethod;
+    this.timedMethodsByMethod = timedMethodsByMethod;
   }
 
   @Override
@@ -34,8 +34,8 @@ final class InstrumentationMarkerScanner extends ClassVisitor {
   public MethodVisitor visitMethod(
       int access, String name, String descriptor, String signature, String[] exceptions) {
     MethodKey methodKey = new MethodKey(name, descriptor);
-    LatencyDescriptorEntry entry = entriesByMethod.get(methodKey);
-    if (entry == null) {
+    TimedMethodDescriptorEntry timedMethod = timedMethodsByMethod.get(methodKey);
+    if (timedMethod == null) {
       return null;
     }
     String visitedClassName = Objects.requireNonNull(internalClassName, "internalClassName");
@@ -74,7 +74,7 @@ final class InstrumentationMarkerScanner extends ClassVisitor {
       public void visitFieldInsn(int opcode, String owner, String fieldName, String descriptor) {
         if (opcode == Opcodes.GETSTATIC
             && visitedClassName.equals(owner)
-            && entry.fieldName().equals(fieldName)
+            && timedMethod.fieldName().equals(fieldName)
             && AsmConstants.TIMER_DESCRIPTOR.equals(descriptor)) {
           sawGeneratedTimerField = true;
         }
