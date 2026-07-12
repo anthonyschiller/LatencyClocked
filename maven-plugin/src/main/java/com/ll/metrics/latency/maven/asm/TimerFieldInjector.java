@@ -29,16 +29,17 @@ public final class TimerFieldInjector {
 
     byte[] classBytes = Files.readAllBytes(classFile);
     ClassReader reader = new ClassReader(classBytes);
-    Map<MethodKey, TimedMethodDescriptorEntry> timedMethodsByMethod =
+    Map<MethodKey, TimedMethodDescriptorEntry> candidateMethodsToInstrument =
         timedMethodsByMethod(timedMethods);
-    InstrumentationMarkerScanner scanner = new InstrumentationMarkerScanner(timedMethodsByMethod);
+    AlreadyInstrumentedMethodScanner scanner =
+        new AlreadyInstrumentedMethodScanner(candidateMethodsToInstrument);
     reader.accept(scanner, ClassReader.SKIP_DEBUG);
 
     ClassWriter writer =
         new ClassWriter(reader, ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
     TimerFieldClassVisitor injector =
         new TimerFieldClassVisitor(
-            writer, timedMethods, timedMethodsByMethod, scanner.instrumentedMethods());
+            writer, timedMethods, candidateMethodsToInstrument, scanner.instrumentedMethods());
     reader.accept(injector, ClassReader.EXPAND_FRAMES);
     if (injector.changed()) {
       Files.write(classFile, writer.toByteArray());

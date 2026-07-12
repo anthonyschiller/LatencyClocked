@@ -9,14 +9,19 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
-final class InstrumentationMarkerScanner extends ClassVisitor {
-  private final Map<MethodKey, TimedMethodDescriptorEntry> timedMethodsByMethod;
+/**
+ * Finds candidate timed methods that already contain generated timing bytecode so repeated plugin
+ * runs can skip method body instrumentation safely.
+ */
+final class AlreadyInstrumentedMethodScanner extends ClassVisitor {
+  private final Map<MethodKey, TimedMethodDescriptorEntry> candidateMethodsToInstrument;
   private final Set<MethodKey> instrumentedMethods = new HashSet<>();
   private String internalClassName;
 
-  InstrumentationMarkerScanner(Map<MethodKey, TimedMethodDescriptorEntry> timedMethodsByMethod) {
+  AlreadyInstrumentedMethodScanner(
+      Map<MethodKey, TimedMethodDescriptorEntry> candidateMethodsToInstrument) {
     super(Opcodes.ASM9);
-    this.timedMethodsByMethod = timedMethodsByMethod;
+    this.candidateMethodsToInstrument = candidateMethodsToInstrument;
   }
 
   @Override
@@ -34,7 +39,7 @@ final class InstrumentationMarkerScanner extends ClassVisitor {
   public MethodVisitor visitMethod(
       int access, String name, String descriptor, String signature, String[] exceptions) {
     MethodKey methodKey = new MethodKey(name, descriptor);
-    TimedMethodDescriptorEntry timedMethod = timedMethodsByMethod.get(methodKey);
+    TimedMethodDescriptorEntry timedMethod = candidateMethodsToInstrument.get(methodKey);
     if (timedMethod == null) {
       return null;
     }
