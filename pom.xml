@@ -33,6 +33,14 @@
         <tag>HEAD</tag>
     </scm>
 
+    <distributionManagement>
+        <repository>
+            <id>github</id>
+            <name>GitHub Packages</name>
+            <url>https://github.com</url>
+        </repository>
+    </distributionManagement>
+
     <issueManagement>
         <system>GitHub Issues</system>
         <url>https://github.com/anthonyschiller/LatencyClocked/issues</url>
