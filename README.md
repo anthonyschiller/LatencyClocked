@@ -7,7 +7,7 @@ stack frames or hot-path reflection.
 
 ## Quick Start
 
-Add the annotation/model API and runtime module:
+Add the runtime module:
 
 ```xml
 <dependency>
@@ -15,6 +15,12 @@ Add the annotation/model API and runtime module:
   <artifactId>latency-clocked-core</artifactId>
   <version>{released-version}</version>
 </dependency>
+```
+
+For multi-module projects, those modules that only declare `@Timed` methods and do not initialize
+or read latency snapshots may depend purely on:
+
+```xml
 <dependency>
   <groupId>com.ll.metrics</groupId>
   <artifactId>latency-clocked-model</artifactId>
@@ -52,7 +58,7 @@ final class PricingService {
 }
 ```
 
-Initialise once during startup and read snapshots:
+Initialize once during startup and read snapshots:
 
 ```java
 import com.ll.metrics.latency.core.LatencyClocked;
