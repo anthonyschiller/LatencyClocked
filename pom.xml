@@ -1,12 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.ll.metrics</groupId>
     <artifactId>latency-clocked</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.0.0</version>
     <packaging>pom</packaging>
     <name>LatencyClocked</name>
     <description>LatencyClocked is a small Java method profiling toolkit for build-time bytecode
@@ -32,7 +30,7 @@
     <scm>
         <connection>scm:git:https://github.com/anthonyschiller/LatencyClocked.git</connection>
         <developerConnection>scm:git:https://github.com/anthonyschiller/LatencyClocked.git</developerConnection>
-        <tag>HEAD</tag>
+        <tag>v1.0.0</tag>
     </scm>
 
     <issueManagement>
@@ -50,7 +48,7 @@
     </modules>
 
     <properties>
-        <project.build.outputTimestamp>2026-01-01T00:00:00Z</project.build.outputTimestamp>
+        <project.build.outputTimestamp>2026-07-12T18:25:00Z</project.build.outputTimestamp>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <checkstyle.version>3.6.0</checkstyle.version>
         <maven.compiler.release>25</maven.compiler.release>
