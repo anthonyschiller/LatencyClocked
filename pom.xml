@@ -30,9 +30,8 @@
     </developers>
 
     <scm>
-        <connection>scm:git:https://github.com/anthonyschiller/LatencyClockedlatency-clocked.git</connection>
-        <developerConnection>scm:https://github.com/anthonyschiller/LatencyClocked/latency-clocked.git</developerConnection>
-        <url>https://github.com/anthonyschiller/LatencyClocked/latency-clocked/source</url>
+        <connection>scm:git:https://github.com/anthonyschiller/LatencyClocked.git</connection>
+        <developerConnection>scm:git:https://github.com/anthonyschiller/LatencyClocked.git</developerConnection>
         <tag>HEAD</tag>
     </scm>
 
