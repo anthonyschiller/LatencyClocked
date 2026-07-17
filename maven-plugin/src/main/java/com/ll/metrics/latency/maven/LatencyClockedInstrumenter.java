@@ -71,9 +71,9 @@ final class LatencyClockedInstrumenter {
         skippedInstrumentedMethods);
   }
 
-  static void generateInstrumentedClassIndexFile(Path outputDirectory,
-      List<TimedMethodDescriptorEntry> timedMethods) throws IOException {
-    writeClassIndex(outputDirectory, timedMethods);
+  static void generateInstrumentedClassIndexResource(
+      Path outputDirectory, List<TimedMethodDescriptorEntry> timedMethods) throws IOException {
+    writeInstrumentedClassIndexToFile(outputDirectory, timedMethods);
   }
 
   static Path writeInstrumentationReportToFile(
@@ -123,30 +123,31 @@ final class LatencyClockedInstrumenter {
     }
   }
 
-  private static void writeClassIndex(
+  private static void writeInstrumentedClassIndexToFile(
       Path outputDirectory,
       Collection<TimedMethodDescriptorEntry> timedMethods)
       throws IOException {
     Objects.requireNonNull(outputDirectory, "outputDirectory");
     Objects.requireNonNull(timedMethods, "timedMethods");
 
-    Path descriptorDirectory =
+    Path indexDirectory =
         outputDirectory
-            .resolve(LatencyClockedConstants.DESCRIPTOR_ROOT)
-            .resolve(LatencyClockedConstants.DESCRIPTOR_DIRECTORY);
-    Path descriptor = descriptorDirectory.resolve(LatencyClockedConstants.DESCRIPTOR_FILE);
+            .resolve(LatencyClockedConstants.INSTRUMENTED_CLASS_INDEX_ROOT)
+            .resolve(LatencyClockedConstants.INSTRUMENTED_CLASS_INDEX_DIRECTORY);
+    Path index =
+        indexDirectory.resolve(LatencyClockedConstants.INSTRUMENTED_CLASS_INDEX_FILE);
     if (timedMethods.isEmpty()) {
-      Files.deleteIfExists(descriptor);
+      Files.deleteIfExists(index);
       return;
     }
 
-    Files.createDirectories(descriptorDirectory);
+    Files.createDirectories(indexDirectory);
 
     List<String> lines =
         new LinkedHashSet<>(
                 timedMethods.stream().map(TimedMethodDescriptorEntry::className).toList())
             .stream().toList();
-    Files.write(descriptor, lines, StandardCharsets.UTF_8);
+    Files.write(index, lines, StandardCharsets.UTF_8);
   }
 
   private static List<String> instrumentationReport(

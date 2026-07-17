@@ -39,7 +39,7 @@
                         <execution>
                             <id>scan-classes</id>
                             <goals>
-                                <goal>scan</goal>
+                                <goal>instrument</goal>
                             </goals>
                         </execution>
                     </executions>

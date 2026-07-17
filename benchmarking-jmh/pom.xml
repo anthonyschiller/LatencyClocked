@@ -111,7 +111,7 @@
                         <id>instrument-benchmark-classes</id>
                         <phase>process-classes</phase>
                         <goals>
-                            <goal>scan</goal>
+                            <goal>instrument</goal>
                         </goals>
                     </execution>
                 </executions>

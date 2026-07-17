@@ -156,21 +156,23 @@ class LatencyClockedInstrumenterTest {
   }
 
   @Test
-  void writeIndexWritesTimerIndex(@TempDir Path outputDirectory) throws IOException {
+  void generateInstrumentedClassIndexResource(@TempDir Path outputDirectory) throws IOException {
     List<TimedMethodDescriptorEntry> timedMethods =
         List.of(
             new TimedMethodDescriptorEntry(
                 "com.example.Service", "call", "()V", "__latency_clocked_timer_0", "id"));
 
-    LatencyClockedInstrumenter.generateInstrumentedClassIndexFile(outputDirectory, timedMethods);
+    LatencyClockedInstrumenter.generateInstrumentedClassIndexResource(
+        outputDirectory, timedMethods);
 
-    Path descriptor = descriptor(outputDirectory);
+    Path descriptor = instrumentedClassIndexResource(outputDirectory);
     assertEquals("com.example.Service", Files.readString(descriptor).trim());
   }
 
   @Test
-  void writeIndexDeduplicatesClassNames(@TempDir Path outputDirectory) throws IOException {
-    LatencyClockedInstrumenter.generateInstrumentedClassIndexFile(
+  void instrumentedClassIndexDeduplicatesClassNames(@TempDir Path outputDirectory)
+          throws IOException {
+    LatencyClockedInstrumenter.generateInstrumentedClassIndexResource(
         outputDirectory,
         List.of(
             new TimedMethodDescriptorEntry(
@@ -178,24 +180,28 @@ class LatencyClockedInstrumenterTest {
             new TimedMethodDescriptorEntry(
                 "com.example.Service", "other", "()V", "__latency_clocked_timer_1", "b")));
 
-    assertEquals("com.example.Service", Files.readString(descriptor(outputDirectory)).trim());
+    assertEquals(
+        "com.example.Service",
+        Files.readString(instrumentedClassIndexResource(outputDirectory)).trim());
   }
 
   @Test
-  void generatedIndexIsIncludedInPackagedJar(@TempDir Path outputDirectory) throws IOException {
-    copyClassToOutputDirectory(SampleTimedClass.class, outputDirectory);
-    scanInstrumentAndWriteIndex(outputDirectory);
+  void generatedClassIndexIsIncludedInPackagedJar(@TempDir Path outputDirectory)
+      throws IOException {
+    copyUninstrumentedClassToOutputDirectory(SampleTimedClass.class, outputDirectory);
+    instrumentClassesAndGenerateIndex(outputDirectory);
     Path jar = outputDirectory.resolve("sample.jar");
 
     try (JarOutputStream outputStream = new JarOutputStream(Files.newOutputStream(jar))) {
-      String indexEntry = LatencyClockedConstants.DESCRIPTOR_RESOURCE;
+      String indexEntry = LatencyClockedConstants.INSTRUMENTED_CLASS_INDEX_RESOURCE;
       outputStream.putNextEntry(new JarEntry(indexEntry));
-      outputStream.write(Files.readAllBytes(descriptor(outputDirectory)));
+      outputStream.write(Files.readAllBytes(instrumentedClassIndexResource(outputDirectory)));
       outputStream.closeEntry();
     }
 
     try (JarFile jarFile = new JarFile(jar.toFile())) {
-      JarEntry index = jarFile.getJarEntry(LatencyClockedConstants.DESCRIPTOR_RESOURCE);
+      JarEntry index =
+          jarFile.getJarEntry(LatencyClockedConstants.INSTRUMENTED_CLASS_INDEX_RESOURCE);
       assertNotNull(index);
       String indexContent =
           new String(jarFile.getInputStream(index).readAllBytes(), StandardCharsets.UTF_8);
@@ -205,30 +211,32 @@ class LatencyClockedInstrumenterTest {
   }
 
   @Test
-  void writeIndexSkipsEmptyIndex(@TempDir Path outputDirectory) throws IOException {
-    LatencyClockedInstrumenter.generateInstrumentedClassIndexFile(outputDirectory, List.of());
+  void instrumentedClassIndexNotGeneratedWhenThereAreNoTimedMethods(@TempDir Path outputDirectory)
+      throws IOException {
+    LatencyClockedInstrumenter.generateInstrumentedClassIndexResource(outputDirectory, List.of());
 
-    Path descriptor = descriptor(outputDirectory);
+    Path descriptor = instrumentedClassIndexResource(outputDirectory);
     assertTrue(Files.notExists(descriptor));
   }
 
   @Test
-  void writeIndexRemovesStaleIndexWhenNoTimedMethodsRemain(@TempDir Path outputDirectory)
+  void staleInstrumentedClassIndexWhenUseOfTimedMethodsIsWithdrawn(@TempDir Path outputDirectory)
       throws IOException {
-    Path descriptor = descriptor(outputDirectory);
+    Path descriptor = instrumentedClassIndexResource(outputDirectory);
     Files.createDirectories(descriptor.getParent());
     Files.writeString(descriptor, "stale");
 
-    LatencyClockedInstrumenter.generateInstrumentedClassIndexFile(outputDirectory, List.of());
+    LatencyClockedInstrumenter.generateInstrumentedClassIndexResource(outputDirectory, List.of());
 
     assertTrue(Files.notExists(descriptor));
   }
 
   @Test
   void injectsTimerFieldForOneTimedMethod(@TempDir Path outputDirectory) throws IOException {
-    copyClassToOutputDirectory(SampleTimedClass.class, outputDirectory);
+    copyUninstrumentedClassToOutputDirectory(SampleTimedClass.class, outputDirectory);
 
-    List<TimedMethodDescriptorEntry> timedMethods = scanInstrumentAndWriteIndex(outputDirectory);
+    List<TimedMethodDescriptorEntry> timedMethods = instrumentClassesAndGenerateIndex(
+            outputDirectory);
 
     assertEquals(5, timedMethods.size());
     TimedMethodDescriptorEntry timedMethod = timedMethods.getFirst();
@@ -239,14 +247,17 @@ class LatencyClockedInstrumenterTest {
     assertTrue(field.isSynthetic());
     assertTrue(field.isPrivate());
     assertEquals(Type.getDescriptor(Timer.class), field.descriptor());
-    assertEquals(SAMPLE_CLASS_NAME, Files.readString(descriptor(outputDirectory)).trim());
+    assertEquals(
+        SAMPLE_CLASS_NAME,
+        Files.readString(instrumentedClassIndexResource(outputDirectory)).trim());
   }
 
   @Test
   void injectsTimerFieldsForMultipleTimedMethods(@TempDir Path outputDirectory) throws IOException {
-    copyClassToOutputDirectory(SampleTimedClass.class, outputDirectory);
+    copyUninstrumentedClassToOutputDirectory(SampleTimedClass.class, outputDirectory);
 
-    List<TimedMethodDescriptorEntry> timedMethods = scanInstrumentAndWriteIndex(outputDirectory);
+    List<TimedMethodDescriptorEntry> timedMethods = instrumentClassesAndGenerateIndex(
+            outputDirectory);
 
     assertEquals(5, timedMethods.size());
     Set<String> fieldNames =
@@ -259,14 +270,17 @@ class LatencyClockedInstrumenterTest {
     assertTrue(fieldNames.contains("__latency_clocked_timer_3"));
     assertTrue(fieldNames.contains("__latency_clocked_timer_4"));
 
-    assertEquals(SAMPLE_CLASS_NAME, Files.readString(descriptor(outputDirectory)).trim());
+    assertEquals(
+        SAMPLE_CLASS_NAME,
+        Files.readString(instrumentedClassIndexResource(outputDirectory)).trim());
   }
 
   @Test
   void injectsTimerFieldForStaticTimedMethod(@TempDir Path outputDirectory) throws IOException {
-    copyClassToOutputDirectory(SampleTimedClass.class, outputDirectory);
+    copyUninstrumentedClassToOutputDirectory(SampleTimedClass.class, outputDirectory);
 
-    List<TimedMethodDescriptorEntry> timedMethods = scanInstrumentAndWriteIndex(outputDirectory);
+    List<TimedMethodDescriptorEntry> timedMethods = instrumentClassesAndGenerateIndex(
+            outputDirectory);
 
     TimedMethodDescriptorEntry staticTimedMethod =
         timedMethods.stream()
@@ -283,9 +297,9 @@ class LatencyClockedInstrumenterTest {
 
   @Test
   void injectsGeneratedBindMethod(@TempDir Path outputDirectory) throws IOException {
-    copyClassToOutputDirectory(SampleTimedClass.class, outputDirectory);
+    copyUninstrumentedClassToOutputDirectory(SampleTimedClass.class, outputDirectory);
 
-    scanInstrumentAndWriteIndex(outputDirectory);
+    instrumentClassesAndGenerateIndex(outputDirectory);
 
     MethodInfo method =
         requiredMethod(outputDirectory, SampleTimedClass.class, "__latency_clocked$bind");
@@ -296,9 +310,10 @@ class LatencyClockedInstrumenterTest {
 
   @Test
   void generatedBindMethodAssignsTimerFields(@TempDir Path outputDirectory) throws Exception {
-    copyClassToOutputDirectory(SampleTimedClass.class, outputDirectory);
+    copyUninstrumentedClassToOutputDirectory(SampleTimedClass.class, outputDirectory);
 
-    List<TimedMethodDescriptorEntry> timedMethods = scanInstrumentAndWriteIndex(outputDirectory);
+    List<TimedMethodDescriptorEntry> timedMethods = instrumentClassesAndGenerateIndex(
+            outputDirectory);
     TimedMethodDescriptorEntry timedMethod = timedMethods.getFirst();
     Class<?> instrumentedClass = loadInstrumentedClass(outputDirectory, SampleTimedClass.class);
     Timers timers = InMemoryTimers.create();
@@ -315,7 +330,7 @@ class LatencyClockedInstrumenterTest {
   @Test
   void injectingTimerFieldsAndBindMethodIsIdempotent(@TempDir Path outputDirectory)
       throws IOException {
-    copyClassToOutputDirectory(SampleTimedClass.class, outputDirectory);
+    copyUninstrumentedClassToOutputDirectory(SampleTimedClass.class, outputDirectory);
     Map<Path, List<TimedMethodDescriptorEntry>> timedMethodsByClassFile =
         LatencyClockedInstrumenter.scan(outputDirectory);
 
@@ -344,14 +359,15 @@ class LatencyClockedInstrumenterTest {
             .count());
   }
 
-  private static List<TimedMethodDescriptorEntry> scanInstrumentAndWriteIndex(Path outputDirectory)
-      throws IOException {
+  private static List<TimedMethodDescriptorEntry> instrumentClassesAndGenerateIndex(
+          Path outputDirectory) throws IOException {
     Map<Path, List<TimedMethodDescriptorEntry>> timedMethodsByClassFile =
         LatencyClockedInstrumenter.scan(outputDirectory);
     LatencyClockedInstrumenter.instrument(timedMethodsByClassFile);
     List<TimedMethodDescriptorEntry> timedMethods =
         timedMethodsByClassFile.values().stream().flatMap(List::stream).toList();
-    LatencyClockedInstrumenter.generateInstrumentedClassIndexFile(outputDirectory, timedMethods);
+    LatencyClockedInstrumenter.generateInstrumentedClassIndexResource(
+        outputDirectory, timedMethods);
     return timedMethodsIn(timedMethodsByClassFile);
   }
 
@@ -360,7 +376,8 @@ class LatencyClockedInstrumenterTest {
     return timedMethodsByClassFile.values().stream().flatMap(List::stream).toList();
   }
 
-  private static void copyClassToOutputDirectory(Class<?> sourceClass, Path outputDirectory)
+  private static void copyUninstrumentedClassToOutputDirectory(
+      Class<?> sourceClass, Path outputDirectory)
       throws IOException {
     Path classFile = classFile(outputDirectory, sourceClass);
     Files.createDirectories(classFile.getParent());
@@ -377,11 +394,11 @@ class LatencyClockedInstrumenterTest {
             + LatencyClockedConstants.CLASS_FILE_EXTENSION);
   }
 
-  private static Path descriptor(Path outputDirectory) {
+  private static Path instrumentedClassIndexResource(Path outputDirectory) {
     return outputDirectory
-        .resolve(LatencyClockedConstants.DESCRIPTOR_ROOT)
-        .resolve(LatencyClockedConstants.DESCRIPTOR_DIRECTORY)
-        .resolve(LatencyClockedConstants.DESCRIPTOR_FILE);
+        .resolve(LatencyClockedConstants.INSTRUMENTED_CLASS_INDEX_ROOT)
+        .resolve(LatencyClockedConstants.INSTRUMENTED_CLASS_INDEX_DIRECTORY)
+        .resolve(LatencyClockedConstants.INSTRUMENTED_CLASS_INDEX_FILE);
   }
 
   private static FieldInfo requiredField(

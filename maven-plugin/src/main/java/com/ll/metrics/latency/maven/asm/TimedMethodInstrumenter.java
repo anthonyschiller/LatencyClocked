@@ -76,6 +76,6 @@ final class TimedMethodInstrumenter extends AdviceAdapter {
         + timedMethod.methodName()
         + timedMethod.methodDescriptor()
         + " is not bound. Call LatencyClocked.initialise(...) before invoking @Timed methods "
-        + "and ensure latency-clocked:scan runs for this module.";
+        + "and ensure latency-clocked:instrument runs for this module.";
   }
 }

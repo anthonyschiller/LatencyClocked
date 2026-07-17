@@ -10,19 +10,19 @@ public final class LatencyClockedConstants {
   public static final String METHOD_ID_SEPARATOR = "#";
   /** JVM class file extension. */
   public static final String CLASS_FILE_EXTENSION = ".class";
-  /** Root directory for generated classpath indexes. */
-  public static final String DESCRIPTOR_ROOT = "META-INF";
-  /** Directory below {@link #DESCRIPTOR_ROOT} for generated indexes. */
-  public static final String DESCRIPTOR_DIRECTORY = "latency-clocked";
-  /** Generated index file name. */
-  public static final String DESCRIPTOR_FILE = "index";
-  /** Complete generated classpath index resource path. */
-  public static final String DESCRIPTOR_RESOURCE =
-      DESCRIPTOR_ROOT
+  /** Root directory for the generated instrumented-class index. */
+  public static final String INSTRUMENTED_CLASS_INDEX_ROOT = "META-INF";
+  /** Directory below {@link #INSTRUMENTED_CLASS_INDEX_ROOT} for generated indexes. */
+  public static final String INSTRUMENTED_CLASS_INDEX_DIRECTORY = "latency-clocked";
+  /** Generated instrumented-class index file name. */
+  public static final String INSTRUMENTED_CLASS_INDEX_FILE = "index";
+  /** Complete generated instrumented-class index resource path. */
+  public static final String INSTRUMENTED_CLASS_INDEX_RESOURCE =
+      INSTRUMENTED_CLASS_INDEX_ROOT
           + RESOURCE_PATH_SEPARATOR
-          + DESCRIPTOR_DIRECTORY
+          + INSTRUMENTED_CLASS_INDEX_DIRECTORY
           + RESOURCE_PATH_SEPARATOR
-          + DESCRIPTOR_FILE;
+          + INSTRUMENTED_CLASS_INDEX_FILE;
   /** System property used to disable startup binding and generated timing. */
   public static final String ENABLED_PROPERTY = "latency-clocked.enabled";
   /** Generated bind method name. */

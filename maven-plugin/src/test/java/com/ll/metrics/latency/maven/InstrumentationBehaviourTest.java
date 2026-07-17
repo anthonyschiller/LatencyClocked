@@ -290,7 +290,7 @@ class InstrumentationBehaviourTest {
       assertInstanceOf(IllegalStateException.class, exception.getCause());
       assertTrue(exception.getCause().getMessage().contains("timer field"));
       assertTrue(exception.getCause().getMessage().contains("Call LatencyClocked.initialise"));
-      assertTrue(exception.getCause().getMessage().contains("latency-clocked:scan"));
+      assertTrue(exception.getCause().getMessage().contains("latency-clocked:instrument"));
     }
   }
 
@@ -364,7 +364,7 @@ class InstrumentationBehaviourTest {
         LatencyClockedInstrumenter.scan(outputDirectory);
     LatencyClockedInstrumenter.InjectionResult injectionResult =
         LatencyClockedInstrumenter.instrument(timedMethodsByClassFile);
-    LatencyClockedInstrumenter.generateInstrumentedClassIndexFile(
+    LatencyClockedInstrumenter.generateInstrumentedClassIndexResource(
         outputDirectory, timedMethodsByClassFile.values().stream().flatMap(List::stream).toList());
     return new InstrumentationResult(timedMethodsByClassFile, injectionResult);
   }
@@ -393,9 +393,9 @@ class InstrumentationBehaviourTest {
 
   private static Path descriptor(Path outputDirectory) {
     return outputDirectory
-        .resolve(LatencyClockedConstants.DESCRIPTOR_ROOT)
-        .resolve(LatencyClockedConstants.DESCRIPTOR_DIRECTORY)
-        .resolve(LatencyClockedConstants.DESCRIPTOR_FILE);
+        .resolve(LatencyClockedConstants.INSTRUMENTED_CLASS_INDEX_ROOT)
+        .resolve(LatencyClockedConstants.INSTRUMENTED_CLASS_INDEX_DIRECTORY)
+        .resolve(LatencyClockedConstants.INSTRUMENTED_CLASS_INDEX_FILE);
   }
 
   private static Object invoke(Object target, String methodName)

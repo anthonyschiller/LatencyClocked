@@ -21,7 +21,7 @@ import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Entry point for startup descriptor loading and generated timer binding. */
+/** Entry point for startup class-index loading and generated timer binding. */
 public final class LatencyClocked {
   private static final Logger LOGGER = LoggerFactory.getLogger(LatencyClocked.class);
   private static volatile boolean enabled = isEnabledPropertySet();
@@ -43,7 +43,7 @@ public final class LatencyClocked {
   }
 
   /**
-   * Initializes generated timer fields from every latency descriptor resource visible to the
+   * Initializes generated timer fields from every instrumented-class index resource visible to the
    * context class loader and returns a runtime handle backed by the supplied timers.
    *
    * <p>This overload is intended for tests and custom timer implementations.
@@ -67,25 +67,25 @@ public final class LatencyClocked {
       Set<String> classNames = new LinkedHashSet<>();
       int resourceCount = 0;
       Enumeration<URL> resources =
-          classLoader.getResources(LatencyClockedConstants.DESCRIPTOR_RESOURCE);
+          classLoader.getResources(LatencyClockedConstants.INSTRUMENTED_CLASS_INDEX_RESOURCE);
       while (resources.hasMoreElements()) {
         URL resource = resources.nextElement();
         resourceCount++;
-        LOGGER.debug("Loading latency descriptor resource {}", resource);
-        loadDescriptor(resource, classNames);
+        LOGGER.debug("Loading latency instrumented-class index resource {}", resource);
+        loadInstrumentedClassIndex(resource, classNames);
       }
       for (String className : classNames) {
         bindClass(className, classLoader, timers);
       }
       LOGGER.debug(
-          "Initialized latency timers for {} classes from {} descriptor resources",
+          "Initialized latency timers for {} classes from {} instrumented-class index resources",
           classNames.size(),
           resourceCount);
       return latencyClocked;
     } catch (IOException e) {
       throw new IllegalStateException(
-          "Failed to load latency descriptor resources named "
-              + LatencyClockedConstants.DESCRIPTOR_RESOURCE,
+          "Failed to load instrumented class-index resources named "
+              + LatencyClockedConstants.INSTRUMENTED_CLASS_INDEX_RESOURCE,
           e);
     }
   }
@@ -114,7 +114,8 @@ public final class LatencyClocked {
     return !"false".equalsIgnoreCase(System.getProperty(LatencyClockedConstants.ENABLED_PROPERTY));
   }
 
-  private static void loadDescriptor(URL resource, Set<String> classNames) throws IOException {
+  private static void loadInstrumentedClassIndex(URL resource, Set<String> classNames)
+      throws IOException {
     try (BufferedReader reader =
         new BufferedReader(new InputStreamReader(resource.openStream(), StandardCharsets.UTF_8))) {
       String line;
@@ -127,7 +128,7 @@ public final class LatencyClocked {
         }
         if (!isClassName(trimmed)) {
           throw new IllegalStateException(
-              "Malformed latency descriptor line at "
+              "Malformed instrumented class-index line at "
                   + resource
                   + ":"
                   + lineNumber
@@ -145,10 +146,10 @@ public final class LatencyClocked {
       targetClass = Class.forName(className, true, classLoader);
     } catch (ClassNotFoundException e) {
       throw new IllegalStateException(
-          "Latency descriptor references missing class '"
+          "Latency instrumented-class index references missing class '"
               + className
-              + "' in latency descriptor "
-              + LatencyClockedConstants.DESCRIPTOR_RESOURCE,
+              + "' in latency instrumented-class index "
+              + LatencyClockedConstants.INSTRUMENTED_CLASS_INDEX_RESOURCE,
           e);
     }
 
@@ -157,10 +158,10 @@ public final class LatencyClocked {
       bindMethod = targetClass.getDeclaredMethod(LatencyClockedConstants.BIND_METHOD, Timers.class);
     } catch (NoSuchMethodException e) {
       throw new IllegalStateException(
-          "Latency descriptor class '"
+          "Latency instrumented-class index class '"
               + className
               + "' from "
-              + LatencyClockedConstants.DESCRIPTOR_RESOURCE
+              + LatencyClockedConstants.INSTRUMENTED_CLASS_INDEX_RESOURCE
               + " is missing generated bind method "
               + LatencyClockedConstants.BIND_METHOD
               + "("
@@ -171,7 +172,7 @@ public final class LatencyClocked {
 
     if (!Modifier.isStatic(bindMethod.getModifiers())) {
       throw new IllegalStateException(
-          "Latency descriptor bind method '"
+          "Latency instrumented-class index bind method '"
               + className
               + LatencyClockedConstants.CLASS_NAME_SEPARATOR
               + LatencyClockedConstants.BIND_METHOD

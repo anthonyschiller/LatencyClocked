@@ -45,7 +45,7 @@
                     <execution>
                         <id>instrument-example</id>
                         <goals>
-                            <goal>scan</goal>
+                            <goal>instrument</goal>
                         </goals>
                     </execution>
                 </executions>

@@ -94,7 +94,7 @@ class AsmInstrumentedBytecodeVerificationTest {
     Map<Path, List<TimedMethodDescriptorEntry>> timedMethodsByClassFile =
         LatencyClockedInstrumenter.scan(outputDirectory);
     LatencyClockedInstrumenter.instrument(timedMethodsByClassFile);
-    LatencyClockedInstrumenter.generateInstrumentedClassIndexFile(
+    LatencyClockedInstrumenter.generateInstrumentedClassIndexResource(
         outputDirectory, timedMethodsByClassFile.values().stream().flatMap(List::stream).toList());
   }
 
@@ -144,9 +144,9 @@ class AsmInstrumentedBytecodeVerificationTest {
 
   private static Path descriptor(Path outputDirectory) {
     return outputDirectory
-        .resolve(LatencyClockedConstants.DESCRIPTOR_ROOT)
-        .resolve(LatencyClockedConstants.DESCRIPTOR_DIRECTORY)
-        .resolve(LatencyClockedConstants.DESCRIPTOR_FILE);
+        .resolve(LatencyClockedConstants.INSTRUMENTED_CLASS_INDEX_ROOT)
+        .resolve(LatencyClockedConstants.INSTRUMENTED_CLASS_INDEX_DIRECTORY)
+        .resolve(LatencyClockedConstants.INSTRUMENTED_CLASS_INDEX_FILE);
   }
 
   private record MethodCalls(List<MethodCall> calls, boolean hasThrowInstruction) {

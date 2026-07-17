@@ -14,7 +14,7 @@ can run. For concurrent applications, use `LatencyClocked.initialisedThreadSafe(
 
 Symptom: a module contains `@Timed` methods but no timers are registered for those methods.
 
-Cause: each Maven module that contains `@Timed` methods must run `latency-clocked:scan`.
+Cause: each Maven module that contains `@Timed` methods must run `latency-clocked:instrument`.
 Multi-module applications may produce one `META-INF/latency-clocked/index` per module.
 
 Fix: configure `latency-clocked-maven-plugin` in every module with timed methods and run at
@@ -32,7 +32,7 @@ index should contain class names only, one per line, with no field names or time
 
 ## Unsupported Timed Methods
 
-Symptom: the Maven build fails during `latency-clocked:scan`.
+Symptom: the Maven build fails during `latency-clocked:instrument`.
 
 Cause: unsupported `@Timed` usage. Abstract methods, native methods, constructors, class
 initialisers, and default interface methods are unsupported. Synthetic and bridge methods are
@@ -52,7 +52,8 @@ method instrumentation are detected and skipped. The class index is written dete
 
 Symptom: no generated timings are recorded even though methods are instrumented.
 
-Cause: `latency-clocked.enabled=false` disables descriptor loading and generated timing code.
+Cause: `latency-clocked.enabled=false` disables instrumented class-index loading and generated
+timing code.
 
 Fix: remove the property or set it to `true`, then call `LatencyClocked.initialise(...)`
 during startup.

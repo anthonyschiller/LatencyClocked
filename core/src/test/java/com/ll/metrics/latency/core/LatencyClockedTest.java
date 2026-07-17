@@ -32,12 +32,12 @@ class LatencyClockedTest {
   void oneIndexFileInvokesGeneratedBindMethod(@TempDir Path tempDir) throws Exception {
     compileFixture(
         tempDir,
-        "DescriptorTarget",
+        "IndexTarget",
         """
         import com.ll.metrics.latency.timer.Timer;
         import com.ll.metrics.latency.timer.Timers;
 
-        public final class DescriptorTarget {
+        public final class IndexTarget {
           public static Timer firstTimer;
           public static int bindInvocations;
 
@@ -47,13 +47,13 @@ class LatencyClockedTest {
           }
         }
         """);
-    writeDescriptor(tempDir, "DescriptorTarget");
+    writeIndex(tempDir, "IndexTarget");
 
-    withDescriptorClasspath(
+    withIndexClasspath(
         tempDir,
         () -> {
           LatencyClocked latencyClocked = LatencyClocked.initialise();
-          Class<?> target = load("DescriptorTarget");
+          Class<?> target = load("IndexTarget");
           assertNotNull(fieldValue(target, "firstTimer"));
           assertTrue(
               latencyClocked.snapshots().stream()
@@ -65,18 +65,18 @@ class LatencyClockedTest {
   @Test
   void multipleIndexResourcesAreAllLoaded(@TempDir Path firstDir, @TempDir Path secondDir)
       throws Exception {
-    compileBindingFixture(firstDir, "FirstDescriptorTarget", "firstTimer", "service.first");
-    compileBindingFixture(secondDir, "SecondDescriptorTarget", "secondTimer", "service.second");
-    writeDescriptor(firstDir, "FirstDescriptorTarget");
-    writeDescriptor(secondDir, "SecondDescriptorTarget");
+    compileBindingFixture(firstDir, "FirstIndexTarget", "firstTimer", "service.first");
+    compileBindingFixture(secondDir, "SecondIndexTarget", "secondTimer", "service.second");
+    writeIndex(firstDir, "FirstIndexTarget");
+    writeIndex(secondDir, "SecondIndexTarget");
 
-    withDescriptorClasspath(
+    withIndexClasspath(
         firstDir,
         secondDir,
         () -> {
           LatencyClocked latencyClocked = LatencyClocked.initialise();
-          assertNotNull(fieldValue(load("FirstDescriptorTarget"), "firstTimer"));
-          assertNotNull(fieldValue(load("SecondDescriptorTarget"), "secondTimer"));
+          assertNotNull(fieldValue(load("FirstIndexTarget"), "firstTimer"));
+          assertNotNull(fieldValue(load("SecondIndexTarget"), "secondTimer"));
           assertTrue(
               latencyClocked.snapshots().stream()
                   .anyMatch(snapshot -> snapshot.id().equals("service.first")));
@@ -91,11 +91,11 @@ class LatencyClockedTest {
       throws Exception {
     compileFixture(
         firstDir,
-        "DuplicateDescriptorTarget",
+        "DuplicateIndexTarget",
         """
         import com.ll.metrics.latency.timer.Timers;
 
-        public final class DuplicateDescriptorTarget {
+        public final class DuplicateIndexTarget {
           public static int bindInvocations;
 
           static void __latency_clocked$bind(Timers timers) {
@@ -104,28 +104,28 @@ class LatencyClockedTest {
           }
         }
         """);
-    writeDescriptor(firstDir, "DuplicateDescriptorTarget");
-    writeDescriptor(secondDir, "DuplicateDescriptorTarget");
+    writeIndex(firstDir, "DuplicateIndexTarget");
+    writeIndex(secondDir, "DuplicateIndexTarget");
 
-    withDescriptorClasspath(
+    withIndexClasspath(
         firstDir,
         secondDir,
         () -> {
           LatencyClocked.initialise();
-          assertEquals(1, fieldValue(load("DuplicateDescriptorTarget"), "bindInvocations"));
+          assertEquals(1, fieldValue(load("DuplicateIndexTarget"), "bindInvocations"));
         });
   }
 
   @Test
   void blankAndCommentLinesAreIgnored(@TempDir Path tempDir) throws Exception {
-    compileBindingFixture(tempDir, "DescriptorTarget", "privateTimer", "service.private");
-    writeDescriptor(tempDir, "\n# comment\n  \nDescriptorTarget\n");
+    compileBindingFixture(tempDir, "IndexTarget", "privateTimer", "service.private");
+    writeIndex(tempDir, "\n# comment\n  \nIndexTarget\n");
 
-    withDescriptorClasspath(
+    withIndexClasspath(
         tempDir,
         () -> {
           LatencyClocked latencyClocked = LatencyClocked.initialise();
-          assertNotNull(fieldValue(load("DescriptorTarget"), "privateTimer"));
+          assertNotNull(fieldValue(load("IndexTarget"), "privateTimer"));
           assertTrue(
               latencyClocked.snapshots().stream()
                   .anyMatch(snapshot -> snapshot.id().equals("service.private")));
@@ -134,26 +134,29 @@ class LatencyClockedTest {
 
   @Test
   void malformedClassNameFailsFast(@TempDir Path tempDir) throws IOException {
-    writeDescriptor(tempDir, "not|a|class");
+    writeIndex(tempDir, "not|a|class");
 
     IllegalStateException exception =
         assertThrows(
             IllegalStateException.class,
             () ->
-                withDescriptorClasspath(tempDir, (ThrowingInitialise) LatencyClocked::initialise));
+                withIndexClasspath(tempDir, (ThrowingInitialise) LatencyClocked::initialise));
 
-    assertTrue(exception.getMessage().contains("Malformed latency descriptor line"));
+    assertTrue(
+        exception
+            .getMessage()
+            .contains("Malformed instrumented class-index line"));
   }
 
   @Test
   void missingClassFailsFast(@TempDir Path tempDir) throws IOException {
-    writeDescriptor(tempDir, "com.example.DoesNotExist");
+    writeIndex(tempDir, "com.example.DoesNotExist");
 
     IllegalStateException exception =
         assertThrows(
             IllegalStateException.class,
             () ->
-                withDescriptorClasspath(tempDir, (ThrowingInitialise) LatencyClocked::initialise));
+                withIndexClasspath(tempDir, (ThrowingInitialise) LatencyClocked::initialise));
 
     assertTrue(exception.getMessage().contains("references missing class"));
   }
@@ -166,16 +169,19 @@ class LatencyClockedTest {
         """
         public final class MissingBindTarget {}
         """);
-    writeDescriptor(tempDir, "MissingBindTarget");
+    writeIndex(tempDir, "MissingBindTarget");
 
     IllegalStateException exception =
         assertThrows(
             IllegalStateException.class,
             () ->
-                withDescriptorClasspath(tempDir, (ThrowingInitialise) LatencyClocked::initialise));
+                withIndexClasspath(tempDir, (ThrowingInitialise) LatencyClocked::initialise));
 
     assertTrue(exception.getMessage().contains("missing generated bind method"));
-    assertTrue(exception.getMessage().contains(LatencyClockedConstants.DESCRIPTOR_RESOURCE));
+    assertTrue(
+        exception
+            .getMessage()
+            .contains(LatencyClockedConstants.INSTRUMENTED_CLASS_INDEX_RESOURCE));
   }
 
   @Test
@@ -192,13 +198,13 @@ class LatencyClockedTest {
           }
         }
         """);
-    writeDescriptor(tempDir, "NonStaticBindTarget");
+    writeIndex(tempDir, "NonStaticBindTarget");
 
     IllegalStateException exception =
         assertThrows(
             IllegalStateException.class,
             () ->
-                withDescriptorClasspath(tempDir, (ThrowingInitialise) LatencyClocked::initialise));
+                withIndexClasspath(tempDir, (ThrowingInitialise) LatencyClocked::initialise));
 
     assertTrue(exception.getMessage().contains("must be static"));
   }
@@ -217,26 +223,26 @@ class LatencyClockedTest {
           }
         }
         """);
-    writeDescriptor(tempDir, "ThrowingBindTarget");
+    writeIndex(tempDir, "ThrowingBindTarget");
 
     IllegalStateException exception =
         assertThrows(
             IllegalStateException.class,
             () ->
-                withDescriptorClasspath(tempDir, (ThrowingInitialise) LatencyClocked::initialise));
+                withIndexClasspath(tempDir, (ThrowingInitialise) LatencyClocked::initialise));
 
     assertTrue(exception.getMessage().contains("Invocation failure"));
   }
 
   @Test
-  void initialiseDoesNotLoadDescriptorsWhenDisabled(@TempDir Path tempDir) throws Exception {
+  void initialiseDoesNotLoadIndexesWhenDisabled(@TempDir Path tempDir) throws Exception {
     compileFixture(
         tempDir,
-        "DisabledDescriptorTarget",
+        "DisabledIndexTarget",
         """
         import com.ll.metrics.latency.timer.Timers;
 
-        public final class DisabledDescriptorTarget {
+        public final class DisabledIndexTarget {
           public static int bindInvocations;
 
           static void __latency_clocked$bind(Timers timers) {
@@ -244,26 +250,26 @@ class LatencyClockedTest {
           }
         }
         """);
-    writeDescriptor(tempDir, "not|a|class\nDisabledDescriptorTarget");
+    writeIndex(tempDir, "not|a|class\nDisabledIndexTarget");
     System.setProperty(LatencyClockedConstants.ENABLED_PROPERTY, "false");
 
-    withDescriptorClasspath(
+    withIndexClasspath(
         tempDir,
         () -> {
           LatencyClocked latencyClocked = LatencyClocked.initialise();
           assertTrue(latencyClocked.snapshots().isEmpty());
-          assertEquals(0, fieldValue(load("DisabledDescriptorTarget"), "bindInvocations"));
+          assertEquals(0, fieldValue(load("DisabledIndexTarget"), "bindInvocations"));
         });
   }
 
   @Test
   void snapshotsRemainAvailableForBoundTimers(@TempDir Path tempDir) throws Exception {
-    compileBindingFixture(tempDir, "DescriptorTarget", "firstTimer", "service.first");
-    writeDescriptor(tempDir, "DescriptorTarget");
+    compileBindingFixture(tempDir, "IndexTarget", "firstTimer", "service.first");
+    writeIndex(tempDir, "IndexTarget");
     LatencyClocked latencyClocked =
-        withDescriptorClasspath(tempDir, (ThrowingInitialise) LatencyClocked::initialise);
+        withIndexClasspath(tempDir, (ThrowingInitialise) LatencyClocked::initialise);
 
-    Timer timer = (Timer) fieldValue(load("DescriptorTarget"), "firstTimer");
+    Timer timer = (Timer) fieldValue(load("IndexTarget"), "firstTimer");
     timer.record(10);
 
     assertTrue(
@@ -273,13 +279,13 @@ class LatencyClockedTest {
 
   @Test
   void threadSafeFactoryBindsGeneratedTimerFields(@TempDir Path tempDir) throws Exception {
-    compileBindingFixture(tempDir, "ThreadSafeDescriptorTarget", "timer", "service.thread.safe");
-    writeDescriptor(tempDir, "ThreadSafeDescriptorTarget");
+    compileBindingFixture(tempDir, "ThreadSafeIndexTarget", "timer", "service.thread.safe");
+    writeIndex(tempDir, "ThreadSafeIndexTarget");
     LatencyClocked latencyClocked =
-        withDescriptorClasspath(
+        withIndexClasspath(
             tempDir, (ThrowingInitialise) LatencyClocked::initialisedThreadSafe);
 
-    assertNotNull(fieldValue(load("ThreadSafeDescriptorTarget"), "timer"));
+    assertNotNull(fieldValue(load("ThreadSafeIndexTarget"), "timer"));
     assertTrue(
         latencyClocked.snapshots().stream()
             .anyMatch(snapshot -> snapshot.id().equals("service.thread.safe")));
@@ -329,37 +335,32 @@ class LatencyClockedTest {
     }
   }
 
-  private static void writeDescriptor(Path root, String content) throws IOException {
-    Path descriptor =
-        root.resolve(LatencyClockedConstants.DESCRIPTOR_ROOT)
-            .resolve(LatencyClockedConstants.DESCRIPTOR_DIRECTORY)
-            .resolve(LatencyClockedConstants.DESCRIPTOR_FILE);
-    Files.createDirectories(descriptor.getParent());
-    Files.writeString(descriptor, content);
+  private static void writeIndex(Path root, String content) throws IOException {
+    Path index =
+        root.resolve(LatencyClockedConstants.INSTRUMENTED_CLASS_INDEX_ROOT)
+            .resolve(LatencyClockedConstants.INSTRUMENTED_CLASS_INDEX_DIRECTORY)
+            .resolve(LatencyClockedConstants.INSTRUMENTED_CLASS_INDEX_FILE);
+    Files.createDirectories(index.getParent());
+    Files.writeString(index, content);
   }
 
-  private void withDescriptorClasspath(Path firstRoot, ThrowingRunnable runnable)
+  private void withIndexClasspath(Path firstRoot, ThrowingRunnable runnable)
       throws IOException {
-    withDescriptorClasspath(new Path[] {firstRoot}, runnable);
+    withIndexClasspath(new Path[] {firstRoot}, runnable);
   }
 
-  private LatencyClocked withDescriptorClasspath(Path firstRoot, ThrowingInitialise initialise)
+  private LatencyClocked withIndexClasspath(Path firstRoot, ThrowingInitialise initialise)
       throws IOException {
-    return withDescriptorClasspath(new Path[] {firstRoot}, initialise);
+    return withIndexClasspath(new Path[] {firstRoot}, initialise);
   }
 
-  private void withDescriptorClasspath(Path firstRoot, Path secondRoot, ThrowingRunnable runnable)
+  private void withIndexClasspath(Path firstRoot, Path secondRoot, ThrowingRunnable runnable)
       throws IOException {
-    withDescriptorClasspath(new Path[] {firstRoot, secondRoot}, runnable);
+    withIndexClasspath(new Path[] {firstRoot, secondRoot}, runnable);
   }
 
-  private LatencyClocked withDescriptorClasspath(
-      Path firstRoot, Path secondRoot, ThrowingInitialise initialise) throws IOException {
-    return withDescriptorClasspath(new Path[] {firstRoot, secondRoot}, initialise);
-  }
-
-  private void withDescriptorClasspath(Path[] roots, ThrowingRunnable runnable) throws IOException {
-    withDescriptorClasspath(
+  private void withIndexClasspath(Path[] roots, ThrowingRunnable runnable) throws IOException {
+    withIndexClasspath(
         roots,
         () -> {
           runnable.run();
@@ -367,7 +368,7 @@ class LatencyClockedTest {
         });
   }
 
-  private LatencyClocked withDescriptorClasspath(Path[] roots, ThrowingInitialise initialise)
+  private LatencyClocked withIndexClasspath(Path[] roots, ThrowingInitialise initialise)
       throws IOException {
     URL[] urls = new URL[roots.length];
     for (int i = 0; i < roots.length; i++) {

@@ -12,9 +12,12 @@ import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 
-/** Maven goal that scans compiled classes and writes the latency descriptor index. */
-@Mojo(name = "scan", defaultPhase = LifecyclePhase.PROCESS_CLASSES, threadSafe = true)
-public final class LatencyClockedScanMojo extends AbstractMojo {
+/**
+ * Maven goal that scans compiled classes, instruments {@code @Timed} methods, and generates the
+ * runtime instrumented class-index.
+ */
+@Mojo(name = "instrument", defaultPhase = LifecyclePhase.PROCESS_CLASSES, threadSafe = true)
+public final class LatencyClockedInstrumentMojo extends AbstractMojo {
   @Parameter(defaultValue = "${project.build.outputDirectory}", readonly = true, required = true)
   private File outputDirectory;
 
@@ -33,8 +36,8 @@ public final class LatencyClockedScanMojo extends AbstractMojo {
           LatencyClockedInstrumenter.instrument(timedMethodsByClassFile);
       List<TimedMethodDescriptorEntry> timedMethods =
           timedMethodsByClassFile.values().stream().flatMap(List::stream).toList();
-      LatencyClockedInstrumenter.generateInstrumentedClassIndexFile(outputDirectory.toPath(),
-              timedMethods);
+      LatencyClockedInstrumenter.generateInstrumentedClassIndexResource(
+          outputDirectory.toPath(), timedMethods);
       Path report =
           LatencyClockedInstrumenter.writeInstrumentationReportToFile(
               reportDirectory.toPath(), timedMethodsByClassFile, injectionResult);

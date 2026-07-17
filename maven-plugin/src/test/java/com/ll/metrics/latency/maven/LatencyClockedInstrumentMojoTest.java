@@ -23,12 +23,12 @@ import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 
-class LatencyClockedScanMojoTest {
+class LatencyClockedInstrumentMojoTest {
   @Test
-  void executeScansInjectsTimerFieldAndWritesDescriptor(@TempDir Path outputDirectory)
+  void classIsInstrumentedAndReportedWhenMojoExecutes(@TempDir Path outputDirectory)
       throws Exception {
     copyClassToOutputDirectory(SampleTimedClass.class, outputDirectory);
-    LatencyClockedScanMojo mojo = new LatencyClockedScanMojo();
+    LatencyClockedInstrumentMojo mojo = new LatencyClockedInstrumentMojo();
     setOutputDirectory(mojo, outputDirectory.toFile());
     Path reportDirectory = outputDirectory.resolve("reports");
     setReportDirectory(mojo, reportDirectory.toFile());
@@ -47,7 +47,7 @@ class LatencyClockedScanMojoTest {
   @Test
   void executeFailsForInvalidTimedUsage(@TempDir Path outputDirectory) throws Exception {
     GoldenFixtureCompiler.compile(outputDirectory, "UnsupportedNativeTimedSample.java");
-    LatencyClockedScanMojo mojo = new LatencyClockedScanMojo();
+    LatencyClockedInstrumentMojo mojo = new LatencyClockedInstrumentMojo();
     setOutputDirectory(mojo, outputDirectory.toFile());
     setReportDirectory(mojo, outputDirectory.resolve("reports").toFile());
 
@@ -64,16 +64,16 @@ class LatencyClockedScanMojoTest {
                 "@Timed cannot be applied to native methods because there is no bytecode body"));
   }
 
-  private static void setOutputDirectory(LatencyClockedScanMojo mojo, File outputDirectory)
+  private static void setOutputDirectory(LatencyClockedInstrumentMojo mojo, File outputDirectory)
       throws ReflectiveOperationException {
-    Field field = LatencyClockedScanMojo.class.getDeclaredField("outputDirectory");
+    Field field = LatencyClockedInstrumentMojo.class.getDeclaredField("outputDirectory");
     field.setAccessible(true);
     field.set(mojo, outputDirectory);
   }
 
-  private static void setReportDirectory(LatencyClockedScanMojo mojo, File reportDirectory)
+  private static void setReportDirectory(LatencyClockedInstrumentMojo mojo, File reportDirectory)
       throws ReflectiveOperationException {
-    Field field = LatencyClockedScanMojo.class.getDeclaredField("reportDirectory");
+    Field field = LatencyClockedInstrumentMojo.class.getDeclaredField("reportDirectory");
     field.setAccessible(true);
     field.set(mojo, reportDirectory);
   }
@@ -143,8 +143,8 @@ class LatencyClockedScanMojoTest {
 
   private static Path descriptor(Path outputDirectory) {
     return outputDirectory
-        .resolve(LatencyClockedConstants.DESCRIPTOR_ROOT)
-        .resolve(LatencyClockedConstants.DESCRIPTOR_DIRECTORY)
-        .resolve(LatencyClockedConstants.DESCRIPTOR_FILE);
+        .resolve(LatencyClockedConstants.INSTRUMENTED_CLASS_INDEX_ROOT)
+        .resolve(LatencyClockedConstants.INSTRUMENTED_CLASS_INDEX_DIRECTORY)
+        .resolve(LatencyClockedConstants.INSTRUMENTED_CLASS_INDEX_FILE);
   }
 }

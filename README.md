@@ -38,7 +38,7 @@ Configure the Maven plugin in every module that contains `@Timed` methods:
   <executions>
     <execution>
       <goals>
-        <goal>scan</goal>
+        <goal>instrument</goal>
       </goals>
     </execution>
   </executions>
@@ -75,7 +75,7 @@ only by generated `__latency_clocked$bind(Timers)` methods.
 
 ## Runtime Model
 
-The plugin provides `latency-clocked:scan`, bound by default to `process-classes`. It scans
+The plugin provides `latency-clocked:instrument`, bound by default to `process-classes`. It scans
 compiled classes for `@Timed`, injects private static synthetic timer fields, injects a generated
 `__latency_clocked$bind(Timers)` method, instruments timed method bodies, and writes class names to
 `target/classes/META-INF/latency-clocked/index`.

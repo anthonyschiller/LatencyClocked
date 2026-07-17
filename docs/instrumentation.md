@@ -1,6 +1,6 @@
 # Instrumentation
 
-The Maven goal is `latency-clocked:scan`, bound by default to `process-classes`.
+The Maven goal is `latency-clocked:instrument`, bound by default to `process-classes`.
 
 For every compiled class with supported `@Timed` methods, the plugin:
 
