@@ -40,6 +40,13 @@
             <scope>provided</scope>
         </dependency>
         <dependency>
+            <groupId>com.ll.metrics</groupId>
+            <artifactId>latency-clocked-core</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>org.openjdk.jmh</groupId>
             <artifactId>jmh-core</artifactId>
             <version>${jmh.version}</version>

@@ -13,6 +13,7 @@ import java.lang.reflect.Modifier;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Enumeration;
 import java.util.LinkedHashSet;
 import java.util.Objects;
@@ -24,19 +25,21 @@ import org.slf4j.LoggerFactory;
 /** Entry point for startup class-index loading and generated timer binding. */
 public final class LatencyClocked {
   private static final Logger LOGGER = LoggerFactory.getLogger(LatencyClocked.class);
+  private static final Object INITIALISATION_LOCK = new Object();
+  private static Timers owner;
+  private static boolean initialising;
+  private static boolean initialised;
   private static volatile boolean enabled = isEnabledPropertySet();
 
-  private final Timers timers;
-
-  private LatencyClocked(Timers timers) {
-    this.timers = Objects.requireNonNull(timers, "timers");
-  }
+  private LatencyClocked() {}
 
   /**
    * Initializes generated timer fields using the single-writer HDR-backed timer catalogue.
    *
    * <p>Use {@link #initialisedThreadSafe()} when timers may be recorded by multiple threads.
    * Use {@link #initialise(Timers)} for tests or custom timer catalogues.
+   *
+   * @return runtime handle backed by single-writer HDR timers
    */
   public static LatencyClocked initialise() {
     return initialise(HdrTimers.create());
@@ -46,11 +49,21 @@ public final class LatencyClocked {
    * Initializes generated timer fields from every instrumented-class index resource visible to the
    * context class loader and returns a runtime handle backed by the supplied timers.
    *
+   * <p>This method is thread-safe and idempotent for the exact same {@link Timers} instance, said
+   * owner. Once an owner has been selected, later calls with another {@link Timers} instance fail
+   * because generated static timer fields cannot be safely rebound to another owner. If startup
+   * fails partway through, it may be retried with the original owner. Synchronous recursive
+   * initialization is unsupported.
+   *
    * <p>This overload is intended for tests and custom timer implementations.
+   *
+   * @param timers timer owner used by generated bind methods
+   * @return runtime handle backed by the supplied timers
    */
   public static LatencyClocked initialise(Timers timers) {
-    LatencyClocked latencyClocked = new LatencyClocked(timers);
+    Objects.requireNonNull(timers, "timers");
     enabled = isEnabledPropertySet();
+    LatencyClocked latencyClocked = new LatencyClocked();
     if (!enabled()) {
       LOGGER.info(
           "LatencyClocked disabled by system property {}=false",
@@ -63,6 +76,34 @@ public final class LatencyClocked {
       classLoader = LatencyClocked.class.getClassLoader();
     }
 
+    synchronized (INITIALISATION_LOCK) {
+      if (initialised) {
+        requireSameOwner(timers);
+        return latencyClocked;
+      }
+
+      if (initialising) {
+        throw new IllegalStateException("Recursive LatencyClocked initialisation is unsupported");
+      }
+
+      if (owner == null) {
+        owner = timers;
+      } else {
+        requireSameOwner(timers);
+      }
+
+      initialising = true;
+      try {
+        bindInstrumentedClasses(classLoader);
+        initialised = true;
+        return latencyClocked;
+      } finally {
+        initialising = false;
+      }
+    }
+  }
+
+  private static void bindInstrumentedClasses(ClassLoader classLoader) {
     try {
       Set<String> classNames = new LinkedHashSet<>();
       int resourceCount = 0;
@@ -75,13 +116,12 @@ public final class LatencyClocked {
         loadInstrumentedClassIndex(resource, classNames);
       }
       for (String className : classNames) {
-        bindClass(className, classLoader, timers);
+        bindClass(className, classLoader);
       }
       LOGGER.debug(
           "Initialized latency timers for {} classes from {} instrumented-class index resources",
           classNames.size(),
           resourceCount);
-      return latencyClocked;
     } catch (IOException e) {
       throw new IllegalStateException(
           "Failed to load instrumented class-index resources named "
@@ -90,22 +130,53 @@ public final class LatencyClocked {
     }
   }
 
+  private static void requireSameOwner(Timers timers) {
+    if (owner != timers) {
+      throw new IllegalStateException(
+          "LatencyClocked has already associated instrumented method timers with a different "
+              + "Timers instance. Rebinding generated timer fields to another owner is "
+              + "unsupported.");
+    }
+  }
+
+  private static void resetForTests() {
+    synchronized (INITIALISATION_LOCK) {
+      owner = null;
+      initialising = false;
+      initialised = false;
+      enabled = isEnabledPropertySet();
+    }
+  }
+
   /**
    * Initializes generated timer fields using the thread-safe HDR-backed timer catalogue.
    *
    * <p>Production applications with concurrent request handling should prefer this method.
    * Use {@link #initialise()} for single-writer timers.
+   *
+   * @return runtime handle backed by thread-safe HDR timers
    */
   public static LatencyClocked initialisedThreadSafe() {
     return initialise(HdrTimers.createWithThreadsafeTimers());
   }
 
-  /** Returns immutable reporting snapshots for generated method timers. */
-  public Collection<TimerSnapshot> snapshots() {
-    return timers.snapshots();
+  /**
+   * Returns immutable reporting snapshots for generated method timers.
+   *
+   * @return point-in-time timer snapshots
+   */
+  public static Collection<TimerSnapshot> snapshots() {
+    if (owner == null) {
+      return Collections.emptyList();
+    }
+    return owner.snapshots();
   }
 
-  /** Returns whether generated latency recording is currently enabled. */
+  /**
+   * Returns whether generated latency recording is currently enabled.
+   *
+   * @return true when generated timing code should run
+   */
   public static boolean enabled() {
     return enabled;
   }
@@ -140,7 +211,7 @@ public final class LatencyClocked {
     }
   }
 
-  private static void bindClass(String className, ClassLoader classLoader, Timers timers) {
+  private static void bindClass(String className, ClassLoader classLoader) {
     Class<?> targetClass;
     try {
       targetClass = Class.forName(className, true, classLoader);
@@ -183,7 +254,7 @@ public final class LatencyClocked {
       if (!bindMethod.canAccess(null)) {
         bindMethod.setAccessible(true);
       }
-      bindMethod.invoke(null, timers);
+      bindMethod.invoke(null, owner);
       LOGGER.debug("Invoked latency bind method for {}", className);
     } catch (IllegalAccessException e) {
       throw new IllegalStateException(
@@ -199,7 +270,8 @@ public final class LatencyClocked {
               + className
               + LatencyClockedConstants.CLASS_NAME_SEPARATOR
               + LatencyClockedConstants.BIND_METHOD
-              + "'",
+              + "': "
+              + e.getCause().getMessage(),
           e.getCause());
     }
   }

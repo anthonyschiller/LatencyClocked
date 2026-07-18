@@ -10,9 +10,22 @@ LatencyClocked latencyClocked = LatencyClocked.initialise();
 the context class loader. For each class name, it loads the class and invokes generated
 `__latency_clocked$bind(Timers)`.
 
-Repeated initialisation is safe. Generated fields are rebound to timers from the latest supplied
-catalogue. Invoking an instrumented method before startup binding fails clearly while latency
-recording is enabled.
+Initialization is thread-safe and serialized. The first successful call establishes one `Timers`
+owner by object identity and binds generated static timer fields to timers claimed from that
+owner. Repeated calls with that exact same `Timers` instance are no-ops. Calls with any different
+`Timers` instance fail, even if the instances compare equal or have identical configuration.
+
+If initialization fails partway through, successful partial bindings are not rolled back. The same
+owner may retry because generated bind methods are repeatable and `claim(methodId)` returns the
+same canonical `Timer` for repeated claims. A different owner is rejected after failure so partial
+bindings cannot silently move from one timer catalogue to another.
+
+Recursive initialization from code executed during discovery, class loading, or generated binding
+is rejected with a clear failure. Concurrent calls from other threads wait for the active startup
+attempt to finish and then re-evaluate the resulting state.
+
+Invoking an instrumented method before startup binding fails clearly while latency recording is
+enabled.
 
 `latency-clocked.enabled=false` disables instrumented class-index loading and generated timing. 
 Instrumented methods branch around their injected timing code while disabled.

@@ -1,31 +1,52 @@
 package com.ll.metrics.latency.core;
 
+import static com.ll.metrics.latency.test.TestUtils.resetLatencyClocked;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.ll.metrics.latency.constants.LatencyClockedConstants;
+import com.ll.metrics.latency.snapshot.TimerSnapshot;
+import com.ll.metrics.latency.timer.InMemoryTimers;
 import com.ll.metrics.latency.timer.Timer;
+import com.ll.metrics.latency.timer.Timers;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collection;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import javax.tools.JavaCompiler;
 import javax.tools.ToolProvider;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 class LatencyClockedTest {
   private final ClassLoader originalClassLoader = Thread.currentThread().getContextClassLoader();
 
+  @BeforeEach
+  void prepare() {
+    resetLatencyClocked();
+  }
+
   @AfterEach
   void reset() {
     Thread.currentThread().setContextClassLoader(originalClassLoader);
     System.clearProperty(LatencyClockedConstants.ENABLED_PROPERTY);
+    resetLatencyClocked();
   }
 
   @Test
@@ -113,6 +134,269 @@ class LatencyClockedTest {
         () -> {
           LatencyClocked.initialise();
           assertEquals(1, fieldValue(load("DuplicateIndexTarget"), "bindInvocations"));
+        });
+  }
+
+  @Test
+  void nullTimersAreRejectedWithoutChangingInitialisationState(@TempDir Path tempDir)
+      throws Exception {
+    compileBindingFixture(tempDir, "NullInputIndexTarget", "timer", "service.null.input");
+    writeIndex(tempDir, "NullInputIndexTarget");
+
+    withIndexClasspath(
+        tempDir,
+        () -> {
+          assertThrows(NullPointerException.class, () -> LatencyClocked.initialise(null));
+
+          Timers timers = InMemoryTimers.create();
+          LatencyClocked.initialise(timers);
+
+          Class<?> target = load("NullInputIndexTarget");
+          assertNotNull(fieldValue(target, "timer"));
+          assertEquals(1, fieldValue(target, "bindInvocations"));
+        });
+  }
+
+  @Test
+  void repeatedInitialiseWithSameTimersIsNoOp(@TempDir Path tempDir) throws Exception {
+    compileBindingFixture(tempDir, "IdempotentIndexTarget", "timer", "service.idempotent");
+    writeIndex(tempDir, "IdempotentIndexTarget");
+
+    withIndexClasspath(
+        tempDir,
+        () -> {
+          Timers timers = InMemoryTimers.create();
+          LatencyClocked.initialise(timers);
+          Timer firstTimer = (Timer) fieldValue(load("IdempotentIndexTarget"), "timer");
+
+          LatencyClocked.initialise(timers);
+          LatencyClocked.initialise(timers);
+
+          Class<?> target = load("IdempotentIndexTarget");
+          assertSame(firstTimer, fieldValue(target, "timer"));
+          assertEquals(1, fieldValue(target, "bindInvocations"));
+        });
+  }
+
+  @Test
+  void repeatedInitialiseWithDifferentTimersFails(@TempDir Path tempDir) throws Exception {
+    compileBindingFixture(tempDir, "DifferentOwnerIndexTarget", "timer", "service.owner");
+    writeIndex(tempDir, "DifferentOwnerIndexTarget");
+
+    withIndexClasspath(
+        tempDir,
+        () -> {
+          Timers firstTimers = InMemoryTimers.create();
+          Timers secondTimers = InMemoryTimers.create();
+          LatencyClocked.initialise(firstTimers);
+          Timer firstTimer = (Timer) fieldValue(load("DifferentOwnerIndexTarget"), "timer");
+
+          IllegalStateException exception =
+              assertThrows(
+                  IllegalStateException.class, () -> LatencyClocked.initialise(secondTimers));
+
+          assertTrue(exception.getMessage().contains("different Timers instance"));
+          assertSame(firstTimer, fieldValue(load("DifferentOwnerIndexTarget"), "timer"));
+          assertEquals(1, fieldValue(load("DifferentOwnerIndexTarget"), "bindInvocations"));
+        });
+  }
+
+  @Test
+  void ownerChecksUseInstanceIdentityInsteadOfEquality(@TempDir Path tempDir) throws Exception {
+    compileBindingFixture(tempDir, "EqualOwnerIndexTarget", "timer", "service.equal");
+    writeIndex(tempDir, "EqualOwnerIndexTarget");
+
+    withIndexClasspath(
+        tempDir,
+        () -> {
+          Timers firstTimers = new EqualTimers();
+          Timers secondTimers = new EqualTimers();
+          assertEquals(firstTimers, secondTimers);
+
+          LatencyClocked.initialise(firstTimers);
+          IllegalStateException exception =
+              assertThrows(
+                  IllegalStateException.class, () -> LatencyClocked.initialise(secondTimers));
+
+          assertTrue(exception.getMessage().contains("different Timers instance"));
+        });
+  }
+
+  @Test
+  void failedInitialiseCanBeRetriedWithSameTimers(@TempDir Path tempDir) throws Exception {
+    compileBindingFixture(tempDir, "FirstRetryTarget", "timer", "service.retry.first");
+    compileFixture(
+        tempDir,
+        "FailingRetryTarget",
+        """
+        import com.ll.metrics.latency.timer.Timer;
+        import com.ll.metrics.latency.timer.Timers;
+
+        public final class FailingRetryTarget {
+          public static Timer timer;
+          public static boolean fail = true;
+          public static int bindInvocations;
+
+          static void __latency_clocked$bind(Timers timers) {
+            bindInvocations++;
+            if (fail) {
+              throw new IllegalStateException("controlled failure");
+            }
+            timer = timers.claim("service.retry.failing");
+          }
+        }
+        """);
+    compileBindingFixture(tempDir, "ThirdRetryTarget", "timer", "service.retry.third");
+    writeIndex(tempDir, "FirstRetryTarget\nFailingRetryTarget\nThirdRetryTarget");
+
+    withIndexClasspath(
+        tempDir,
+        () -> {
+          Timers timers = InMemoryTimers.create();
+          assertThrows(IllegalStateException.class, () -> LatencyClocked.initialise(timers));
+          Timer firstTimer = (Timer) fieldValue(load("FirstRetryTarget"), "timer");
+          assertNotNull(firstTimer);
+          assertEquals(1, fieldValue(load("FirstRetryTarget"), "bindInvocations"));
+          assertEquals(1, fieldValue(load("FailingRetryTarget"), "bindInvocations"));
+
+          setStaticField(load("FailingRetryTarget"), "fail", false);
+          LatencyClocked.initialise(timers);
+
+          assertSame(firstTimer, fieldValue(load("FirstRetryTarget"), "timer"));
+          assertNotNull(fieldValue(load("FailingRetryTarget"), "timer"));
+          assertNotNull(fieldValue(load("ThirdRetryTarget"), "timer"));
+          assertEquals(2, fieldValue(load("FirstRetryTarget"), "bindInvocations"));
+          assertEquals(2, fieldValue(load("FailingRetryTarget"), "bindInvocations"));
+          assertEquals(1, fieldValue(load("ThirdRetryTarget"), "bindInvocations"));
+        });
+  }
+
+  @Test
+  void failedInitialiseCannotBeRetriedWithDifferentTimers(@TempDir Path tempDir)
+      throws Exception {
+    compileBindingFixture(tempDir, "FirstFailedOwnerTarget", "timer", "service.failed.first");
+    compileFixture(
+        tempDir,
+        "FailingOwnerTarget",
+        """
+        import com.ll.metrics.latency.timer.Timers;
+
+        public final class FailingOwnerTarget {
+          public static int bindInvocations;
+
+          static void __latency_clocked$bind(Timers timers) {
+            bindInvocations++;
+            throw new IllegalStateException("controlled failure");
+          }
+        }
+        """);
+    writeIndex(tempDir, "FirstFailedOwnerTarget\nFailingOwnerTarget");
+
+    withIndexClasspath(
+        tempDir,
+        () -> {
+          Timers firstTimers = InMemoryTimers.create();
+          Timers secondTimers = InMemoryTimers.create();
+          assertThrows(IllegalStateException.class, () -> LatencyClocked.initialise(firstTimers));
+
+          IllegalStateException exception =
+              assertThrows(
+                  IllegalStateException.class, () -> LatencyClocked.initialise(secondTimers));
+
+          assertTrue(exception.getMessage().contains("different Timers instance"));
+          assertEquals(1, fieldValue(load("FirstFailedOwnerTarget"), "bindInvocations"));
+          assertEquals(1, fieldValue(load("FailingOwnerTarget"), "bindInvocations"));
+        });
+  }
+
+  @Test
+  void concurrentInitialiseWithSameTimersBindsOnce(@TempDir Path tempDir) throws Exception {
+    compileBlockingBindingFixture(tempDir, "ConcurrentSameOwnerTarget", "service.concurrent");
+    writeIndex(tempDir, "ConcurrentSameOwnerTarget");
+
+    try (URLClassLoader classLoader =
+            new URLClassLoader(new URL[] {tempDir.toUri().toURL()}, originalClassLoader);
+        ExecutorService executor = Executors.newFixedThreadPool(2)) {
+      Class<?> target = Class.forName("ConcurrentSameOwnerTarget", true, classLoader);
+      CountDownLatch entered = (CountDownLatch) fieldValue(target, "entered");
+      CountDownLatch release = (CountDownLatch) fieldValue(target, "release");
+      Timers timers = InMemoryTimers.create();
+
+      final Future<LatencyClocked> first =
+          executor.submit(
+              () -> withContextClassLoader(classLoader, () -> LatencyClocked.initialise(timers)));
+      assertTrue(entered.await(5, TimeUnit.SECONDS));
+      final Future<LatencyClocked> second =
+          executor.submit(
+              () -> withContextClassLoader(classLoader, () -> LatencyClocked.initialise(timers)));
+
+      assertThrows(TimeoutException.class, () -> second.get(100, TimeUnit.MILLISECONDS));
+      release.countDown();
+      first.get(5, TimeUnit.SECONDS);
+      second.get(5, TimeUnit.SECONDS);
+      assertEquals(1, fieldValue(target, "bindInvocations"));
+      assertEquals(1, timers.snapshots().size());
+    }
+  }
+
+  @Test
+  void concurrentInitialiseWithDifferentTimersRejectsLosingOwner(@TempDir Path tempDir)
+      throws Exception {
+    compileBlockingBindingFixture(tempDir, "ConcurrentDifferentOwnerTarget", "service.race");
+    writeIndex(tempDir, "ConcurrentDifferentOwnerTarget");
+
+    try (URLClassLoader classLoader =
+            new URLClassLoader(new URL[] {tempDir.toUri().toURL()}, originalClassLoader);
+        ExecutorService executor = Executors.newFixedThreadPool(2)) {
+      Class<?> target = Class.forName("ConcurrentDifferentOwnerTarget", true, classLoader);
+      CountDownLatch entered = (CountDownLatch) fieldValue(target, "entered");
+      CountDownLatch release = (CountDownLatch) fieldValue(target, "release");
+      Timers firstTimers = InMemoryTimers.create();
+      Timers secondTimers = InMemoryTimers.create();
+
+      Future<LatencyClocked> first =
+          executor.submit(
+              () ->
+                  withContextClassLoader(
+                      classLoader, () -> LatencyClocked.initialise(firstTimers)));
+      assertTrue(entered.await(5, TimeUnit.SECONDS));
+      Future<LatencyClocked> second =
+          executor.submit(
+              () ->
+                  withContextClassLoader(
+                      classLoader, () -> LatencyClocked.initialise(secondTimers)));
+
+      release.countDown();
+      first.get(5, TimeUnit.SECONDS);
+      IllegalStateException exception =
+          assertThrows(IllegalStateException.class, () -> unwrap(second));
+
+      assertTrue(exception.getMessage().contains("different Timers instance"));
+      assertEquals(1, fieldValue(target, "bindInvocations"));
+      assertEquals(1, firstTimers.snapshots().size());
+      assertTrue(secondTimers.snapshots().isEmpty());
+    }
+  }
+
+  @Timeout(2)
+  @Test
+  void initialiseFailsOnSameThreadRecursiveEntry(@TempDir Path tempDir) throws Exception {
+    compileBindingFixture(tempDir, "RecursiveClaimIndexTarget", "timer", "service.recursive");
+    writeIndex(tempDir, "RecursiveClaimIndexTarget");
+
+    withIndexClasspath(
+        tempDir,
+        () -> {
+          RecursingTimers timers = new RecursingTimers(Thread.currentThread());
+          IllegalStateException exception =
+              assertThrows(IllegalStateException.class, () -> LatencyClocked.initialise(timers));
+          assertTrue(exception.getMessage().contains("Invocation failure"));
+          assertTrue(exception.getMessage().contains("Recursive LatencyClocked initialisation"));
+          assertTrue(LatencyClocked.snapshots().isEmpty());
+
+          LatencyClocked.initialise(timers);
+          assertNotNull(fieldValue(load("RecursiveClaimIndexTarget"), "timer"));
+          assertEquals(1, LatencyClocked.snapshots().size());
         });
   }
 
@@ -302,13 +586,47 @@ class LatencyClockedTest {
 
         public final class %s {
           public static Timer %s;
+          public static int bindInvocations;
 
           static void __latency_clocked$bind(Timers timers) {
+            bindInvocations++;
             %s = timers.claim("%s");
           }
         }
         """
             .formatted(className, fieldName, fieldName, timerId));
+  }
+
+  private static void compileBlockingBindingFixture(Path root, String className, String timerId)
+      throws IOException {
+    compileFixture(
+        root,
+        className,
+        """
+        import com.ll.metrics.latency.timer.Timer;
+        import com.ll.metrics.latency.timer.Timers;
+        import java.util.concurrent.CountDownLatch;
+
+        public final class %s {
+          public static final CountDownLatch entered = new CountDownLatch(1);
+          public static final CountDownLatch release = new CountDownLatch(1);
+          public static Timer timer;
+          public static int bindInvocations;
+
+          static void __latency_clocked$bind(Timers timers) {
+            entered.countDown();
+            try {
+              release.await();
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+              throw new IllegalStateException(e);
+            }
+            bindInvocations++;
+            timer = timers.claim("%s");
+          }
+        }
+        """
+            .formatted(className, timerId));
   }
 
   private static void compileFixture(Path root, String className, String source)
@@ -381,6 +699,18 @@ class LatencyClockedTest {
     }
   }
 
+  private LatencyClocked withContextClassLoader(
+      ClassLoader classLoader, ThrowingInitialise initialise) {
+    Thread currentThread = Thread.currentThread();
+    ClassLoader previousClassLoader = currentThread.getContextClassLoader();
+    currentThread.setContextClassLoader(classLoader);
+    try {
+      return initialise.run();
+    } finally {
+      currentThread.setContextClassLoader(previousClassLoader);
+    }
+  }
+
   private static Class<?> load(String className) {
     try {
       return Class.forName(className, true, Thread.currentThread().getContextClassLoader());
@@ -396,6 +726,81 @@ class LatencyClockedTest {
       return field.get(null);
     } catch (ReflectiveOperationException e) {
       throw new IllegalStateException(e);
+    }
+  }
+
+  private static void setStaticField(Class<?> target, String fieldName, Object value) {
+    try {
+      Field field = target.getDeclaredField(fieldName);
+      field.setAccessible(true);
+      field.set(null, value);
+    } catch (ReflectiveOperationException e) {
+      throw new IllegalStateException(e);
+    }
+  }
+
+  private static LatencyClocked unwrap(Future<LatencyClocked> future) throws Exception {
+    try {
+      return future.get(5, TimeUnit.SECONDS);
+    } catch (ExecutionException e) {
+      if (e.getCause() instanceof Exception exception) {
+        throw exception;
+      }
+      throw e;
+    }
+  }
+
+  private static final class EqualTimers implements Timers {
+    private final Timers delegate = InMemoryTimers.create();
+
+    @Override
+    public Timer claim(String methodId) {
+      return delegate.claim(methodId);
+    }
+
+    @Override
+    public Collection<TimerSnapshot> snapshots() {
+      return delegate.snapshots();
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      return other instanceof EqualTimers;
+    }
+
+    @Override
+    public int hashCode() {
+      return 1;
+    }
+  }
+
+  private static final class RecursingTimers implements Timers {
+    private final Timers delegate = InMemoryTimers.create();
+    private final Thread expectedThread;
+    private boolean recurse = true;
+    private boolean recursedOnExpectedThread;
+
+    private RecursingTimers(Thread expectedThread) {
+      this.expectedThread = expectedThread;
+    }
+
+    @Override
+    public Timer claim(String methodId) {
+      if (recurse) {
+        recurse = false;
+        recursedOnExpectedThread = Thread.currentThread() == expectedThread;
+        LatencyClocked.initialise(this);
+      }
+      return delegate.claim(methodId);
+    }
+
+    @Override
+    public Collection<TimerSnapshot> snapshots() {
+      return delegate.snapshots();
+    }
+
+    private boolean recursedOnExpectedThread() {
+      return recursedOnExpectedThread;
     }
   }
 

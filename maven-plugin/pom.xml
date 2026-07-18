@@ -30,6 +30,13 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <groupId>com.ll.metrics</groupId>
+            <artifactId>latency-clocked-core</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>org.ow2.asm</groupId>
             <artifactId>asm</artifactId>
             <version>${asm.version}</version>

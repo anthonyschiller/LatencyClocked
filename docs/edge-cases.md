@@ -44,8 +44,10 @@ be verified.
 Startup lifecycle cases:
 
 - Calling `LatencyClocked.initialise(timers)` once binds generated timer fields.
-- Calling `LatencyClocked.initialise(timers)` again is safe and rebinds fields to the latest
-  timer catalogue.
+- Calling `LatencyClocked.initialise(timers)` again with the same `Timers` instance is a no-op.
+- Calling `LatencyClocked.initialise(otherTimers)` after success or partial failure is rejected.
+- A failed startup attempt may be retried with the original `Timers` instance.
+- Concurrent startup calls are serialized; same-thread recursive startup is rejected.
 - Calling an instrumented method before startup binding fails with an actionable
   `IllegalStateException` when LatencyClocked is enabled.
 - Calling an instrumented method while `latency-clocked.enabled=false` bypasses generated

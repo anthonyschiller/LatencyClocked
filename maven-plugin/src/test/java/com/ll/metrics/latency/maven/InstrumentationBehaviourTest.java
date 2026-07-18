@@ -1,5 +1,6 @@
 package com.ll.metrics.latency.maven;
 
+import static com.ll.metrics.latency.test.TestUtils.resetLatencyClocked;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -21,11 +22,23 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class InstrumentationBehaviourTest {
   private static final String SAMPLE_CLASS_NAME = "golden.GoldenTimedSamples";
+
+  @BeforeEach
+  void prepare() {
+    resetLatencyClocked();
+  }
+
+  @AfterEach
+  void reset() {
+    resetLatencyClocked();
+  }
 
   @Test
   void successfulVoidMethodRecordsExactlyOnce(@TempDir Path outputDirectory) throws Exception {
@@ -295,7 +308,8 @@ class InstrumentationBehaviourTest {
   }
 
   @Test
-  void callingInitialiseTwiceRebindsSafely(@TempDir Path outputDirectory) throws Exception {
+  void callingInitialiseTwiceWithDifferentTimersFails(@TempDir Path outputDirectory)
+      throws Exception {
     compileGolden(outputDirectory);
     instrument(outputDirectory);
     try (URLClassLoader classLoader =
@@ -309,14 +323,17 @@ class InstrumentationBehaviourTest {
         Timers firstTimers = InMemoryTimers.create();
         Timers secondTimers = InMemoryTimers.create();
         LatencyClocked.initialise(firstTimers);
-        LatencyClocked.initialise(secondTimers);
         Class<?> sampleClass = Class.forName(SAMPLE_CLASS_NAME, true, classLoader);
         Object instance = sampleClass.getDeclaredConstructor().newInstance();
 
         invoke(instance, "successfulVoid");
+        IllegalStateException exception =
+            assertThrows(
+                IllegalStateException.class, () -> LatencyClocked.initialise(secondTimers));
 
-        assertEquals(0, snapshot(firstTimers, "successfulVoid").count());
-        assertEquals(1, snapshot(secondTimers, "successfulVoid").count());
+        assertTrue(exception.getMessage().contains("different Timers instance"));
+        assertEquals(1, snapshot(firstTimers, "successfulVoid").count());
+        assertTrue(secondTimers.snapshots().isEmpty());
       } finally {
         currentThread.setContextClassLoader(previousClassLoader);
       }

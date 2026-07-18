@@ -17,9 +17,10 @@ public interface Timers {
    * <p>This is an instrumentation SPI used by generated {@code __latency_clocked$bind} methods.
    * Application code must not use it for unrelated, ad hoc, or programmatic measurements.
    *
-   * <p>Implementations must reject null or blank method identities, be thread-safe, return the
-   * same timer when the same identity is claimed again, and never allow two different method
-   * identities to share one timer.
+   * <p>Implementations must reject null or blank method identities, be thread-safe, create exactly
+   * one timer for each previously unseen canonical method identity, return that same timer for
+   * repeated claims of the exact same identity, and never allow two different method identities to
+   * share one timer.
    *
    * @param methodId deterministic identity generated for one annotated method
    * @return canonical timer owned by that method identity

@@ -10,6 +10,28 @@ Cause: generated timer fields are assigned during startup by `LatencyClocked.ini
 Fix: call `LatencyClocked.initialise()` or `LatencyClocked.initialise(timers)` before timed methods
 can run. For concurrent applications, use `LatencyClocked.initialisedThreadSafe()`.
 
+## Rebinding To Another Timers Instance
+
+Symptom: startup fails with a message saying latency has already associated instrumented method
+timers with a different `Timers` instance.
+
+Cause: generated timer fields were already bound, or a previous failed startup attempt partially
+bound fields, using another `Timers` owner. Runtime ownership is based on instance identity, not
+`equals`, because generated fields hold concrete `Timer` references.
+
+Fix: initialize once during startup and keep using the returned `LatencyClocked` handle for
+snapshots. If startup failed and must be retried, retry with the same `Timers` instance.
+
+## Recursive Initialisation
+
+Symptom: startup fails with a recursive initialization error.
+
+Cause: code executed during class loading or generated binding called `LatencyClocked.initialise`
+again on the same thread.
+
+Fix: move startup initialization earlier in application bootstrapping so it is not triggered from
+instrumented class initialization or generated bind code.
+
 ## Plugin Not Configured In A Module
 
 Symptom: a module contains `@Timed` methods but no timers are registered for those methods.

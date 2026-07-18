@@ -1,5 +1,6 @@
 package com.ll.metrics.latency.jmh;
 
+import static com.ll.metrics.latency.test.TestUtils.resetLatencyClocked;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -28,6 +29,7 @@ class BenchmarkInstrumentationTest {
 
   @BeforeEach
   void setUp() {
+    resetLatencyClocked();
     previousRegistries.addAll(Metrics.globalRegistry.getRegistries());
     previousRegistries.forEach(Metrics::removeRegistry);
     Metrics.globalRegistry.clear();
@@ -42,6 +44,7 @@ class BenchmarkInstrumentationTest {
     Metrics.globalRegistry.clear();
     previousRegistries.forEach(Metrics::addRegistry);
     previousRegistries.clear();
+    resetLatencyClocked();
   }
 
   @Test

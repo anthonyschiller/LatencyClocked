@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <!-- Invoked reflectively by core test-jar utilities so the hook can remain private. -->
+    <Match>
+        <Class name="com.ll.metrics.latency.core.LatencyClocked" />
+        <Method name="resetForTests" />
+        <Bug pattern="UPM_UNCALLED_PRIVATE_METHOD" />
+    </Match>
+
+    <!-- initialise returns a lightweight facade handle while snapshots remain globally owned. -->
+    <Match>
+        <Class name="com.ll.metrics.latency.core.LatencyClocked" />
+        <Method
+                name="initialise"
+                params="com.ll.metrics.latency.timer.Timers"
+                returns="com.ll.metrics.latency.core.LatencyClocked" />
+        <Bug pattern="ISC_INSTANTIATE_STATIC_CLASS" />
+    </Match>
+</FindBugsFilter>

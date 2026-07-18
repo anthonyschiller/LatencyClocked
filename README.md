@@ -73,6 +73,11 @@ latencyClocked.snapshots().forEach(System.out::println);
 Application code should not call `Timers.claim(...)`. That method is an instrumentation SPI used
 only by generated `__latency_clocked$bind(Timers)` methods.
 
+`LatencyClocked.initialise(timers)` is idempotent by `Timers` instance identity. The first
+successful call discovers indexed classes and binds all generated timer fields. Later calls with
+the same `Timers` instance are no-ops. Calls with a different `Timers` instance fail because
+generated static timer fields must not silently move to another owner.
+
 ## Runtime Model
 
 The plugin provides `latency-clocked:instrument`, bound by default to `process-classes`. It scans
@@ -91,8 +96,7 @@ executions of that method. Exceptions are intentionally excluded.
 
 Public snapshots expose count, min, max, mean, p50, p90, p95, p99, and p999 in nanoseconds. HDR
 Histogram is used internally by `latency-clocked-hdr`; histogram types are not part of the public
-API. `LatencyClocked.initialise()` uses lower-overhead single-writer HDR timers, and
-API. `LatencyClocked.initialise()` uses lower-overhead single-writer HDR timers, and
+`LatencyClocked.initialise()` uses lower-overhead single-writer HDR timers, and
 `LatencyClocked.initialisedThreadSafe()` uses HDR `ConcurrentHistogram` timers.
 
 Set `-Dlatency-clocked.enabled=false` to disable generated timer binding at startup. Instrumented
