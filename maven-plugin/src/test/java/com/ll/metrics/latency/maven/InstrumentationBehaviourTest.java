@@ -23,6 +23,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import javax.management.Attribute;
 import javax.management.ObjectName;
 import org.junit.jupiter.api.AfterEach;
@@ -185,7 +187,7 @@ class InstrumentationBehaviourTest {
       InvocationTargetException exception =
           assertThrows(InvocationTargetException.class, () -> invoke(instance, "throwingMethod"));
 
-      assertTrue(exception.getCause() instanceof IllegalStateException);
+      assertInstanceOf(IllegalStateException.class, exception.getCause());
       assertEquals(0, snapshot(fixture.timers(), "throwingMethod").count());
     }
   }
@@ -205,10 +207,10 @@ class InstrumentationBehaviourTest {
               InvocationTargetException.class,
               () -> invoke(instance, "exceptionThrownInsideCatch"));
 
-      assertTrue(beforeReturn.getCause() instanceof IllegalStateException);
+      assertInstanceOf(IllegalStateException.class, beforeReturn.getCause());
       assertEquals("before return", beforeReturn.getCause().getMessage());
-      assertTrue(insideCatch.getCause() instanceof IllegalStateException);
-      assertTrue(insideCatch.getCause().getCause() instanceof IllegalArgumentException);
+      assertInstanceOf(IllegalStateException.class, insideCatch.getCause());
+      assertInstanceOf(IllegalArgumentException.class, insideCatch.getCause().getCause());
       assertEquals(0, snapshot(fixture.timers(), "exceptionThrownBeforeReturn").count());
       assertEquals(0, snapshot(fixture.timers(), "exceptionThrownInsideCatch").count());
       assertEquals(11, fieldValue(instance, "sideEffect"));
@@ -418,6 +420,28 @@ class InstrumentationBehaviourTest {
       invoke(instance, "toggleEnabled");
 
       assertEquals(0, snapshot(fixture.timers(), "toggleEnabled").count());
+    }
+  }
+
+  @Test
+  void initialiseEnsuresEachTimedMethodsRespectiveTimerFieldHasClaimedAndTimerBoundBeforeReturning(
+          @TempDir Path outputDirectory) throws Exception {
+    compileGolden(outputDirectory);
+    InstrumentationResult instrumentationResult = instrument(outputDirectory);
+    Set<String> expectedTimerIds =
+        instrumentationResult.timedMethodsByClassFile().values().stream()
+            .flatMap(List::stream)
+            .map(TimedMethodDescriptorEntry::timerId)
+            .collect(Collectors.toSet());
+
+    try (RuntimeFixture fixture = load(outputDirectory)) {
+      Set<String> actualTimerIds =
+          fixture.timers().snapshots().stream()
+              .map(TimerSnapshot::id)
+              .collect(Collectors.toSet());
+
+      assertEquals(expectedTimerIds, actualTimerIds);
+      assertTrue(fixture.timers().snapshots().stream().allMatch(snapshot -> snapshot.count() == 0));
     }
   }
 
