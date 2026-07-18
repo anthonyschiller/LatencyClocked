@@ -523,6 +523,51 @@ class LatencyClockedTest {
   }
 
   @Test
+  void wrongSignatureBindMethodFailsFast(@TempDir Path tempDir) throws IOException {
+    compileFixture(
+        tempDir,
+        "WrongSignatureBindTarget",
+        """
+        public final class WrongSignatureBindTarget {
+          static void __latency_clocked$bind() {}
+        }
+        """);
+    writeIndex(tempDir, "WrongSignatureBindTarget");
+
+    IllegalStateException exception =
+        assertThrows(
+            IllegalStateException.class,
+            () ->
+                withIndexClasspath(tempDir, (ThrowingInitialise) LatencyClocked::initialise));
+
+    assertTrue(exception.getMessage().contains("missing generated bind method"));
+    assertTrue(exception.getMessage().contains("WrongSignatureBindTarget"));
+    assertTrue(exception.getMessage().contains(LatencyClockedConstants.BIND_METHOD));
+    assertTrue(exception.getMessage().contains(Timers.class.getName()));
+  }
+
+  @Test
+  void timersClaimFailureFailsFast(@TempDir Path tempDir) throws Exception {
+    compileBindingFixture(tempDir, "ClaimFailureTarget", "timer", "service.claim.failure");
+    writeIndex(tempDir, "ClaimFailureTarget");
+
+    withIndexClasspath(
+        tempDir,
+        () -> {
+          ThrowingClaimTimers timers = new ThrowingClaimTimers();
+
+          IllegalStateException exception =
+              assertThrows(IllegalStateException.class, () -> LatencyClocked.initialise(timers));
+
+          assertTrue(exception.getMessage().contains("Invocation failure"));
+          assertTrue(exception.getMessage().contains("ClaimFailureTarget"));
+          assertTrue(exception.getCause().getMessage().contains("claim failed"));
+          assertEquals(1, timers.claimAttempts());
+          assertTrue(LatencyClocked.snapshots().isEmpty());
+        });
+  }
+
+  @Test
   void bindInvocationFailureFailsFast(@TempDir Path tempDir) throws IOException {
     compileFixture(
         tempDir,
@@ -829,6 +874,25 @@ class LatencyClockedTest {
 
     private boolean recursedOnExpectedThread() {
       return recursedOnExpectedThread;
+    }
+  }
+
+  private static final class ThrowingClaimTimers implements Timers {
+    private int claimAttempts;
+
+    @Override
+    public Timer claim(String methodId) {
+      claimAttempts++;
+      throw new IllegalStateException("claim failed for " + methodId);
+    }
+
+    @Override
+    public Collection<TimerSnapshot> snapshots() {
+      return java.util.List.of();
+    }
+
+    private int claimAttempts() {
+      return claimAttempts;
     }
   }
 

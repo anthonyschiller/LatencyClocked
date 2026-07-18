@@ -290,9 +290,9 @@ public final class LatencyClocked {
       targetClass = Class.forName(className, true, classLoader);
     } catch (ClassNotFoundException e) {
       throw new IllegalStateException(
-          "Latency instrumented-class index references missing class '"
+          "Instrumented-class index references missing class '"
               + className
-              + "' in latency instrumented-class index "
+              + "' in "
               + LatencyClockedConstants.INSTRUMENTED_CLASS_INDEX_RESOURCE,
           e);
     }
@@ -302,7 +302,7 @@ public final class LatencyClocked {
       bindMethod = targetClass.getDeclaredMethod(LatencyClockedConstants.BIND_METHOD, Timers.class);
     } catch (NoSuchMethodException e) {
       throw new IllegalStateException(
-          "Latency instrumented-class index class '"
+          "Instrumented-class index class '"
               + className
               + "' from "
               + LatencyClockedConstants.INSTRUMENTED_CLASS_INDEX_RESOURCE
@@ -316,7 +316,7 @@ public final class LatencyClocked {
 
     if (!Modifier.isStatic(bindMethod.getModifiers())) {
       throw new IllegalStateException(
-          "Latency instrumented-class index bind method '"
+          "Instrumented-class index bind method '"
               + className
               + LatencyClockedConstants.CLASS_NAME_SEPARATOR
               + LatencyClockedConstants.BIND_METHOD
@@ -328,10 +328,10 @@ public final class LatencyClocked {
         bindMethod.setAccessible(true);
       }
       bindMethod.invoke(null, owner);
-      LOGGER.debug("Invoked latency bind method for {}", className);
+      LOGGER.debug("Invoked bind method for {}", className);
     } catch (IllegalAccessException e) {
       throw new IllegalStateException(
-          "Illegal access invoking latency bind method '"
+          "Illegal access invoking bind method '"
               + className
               + LatencyClockedConstants.CLASS_NAME_SEPARATOR
               + LatencyClockedConstants.BIND_METHOD
@@ -339,7 +339,7 @@ public final class LatencyClocked {
           e);
     } catch (InvocationTargetException e) {
       throw new IllegalStateException(
-          "Invocation failure in latency bind method '"
+          "Invocation failure in bind method '"
               + className
               + LatencyClockedConstants.CLASS_NAME_SEPARATOR
               + LatencyClockedConstants.BIND_METHOD
