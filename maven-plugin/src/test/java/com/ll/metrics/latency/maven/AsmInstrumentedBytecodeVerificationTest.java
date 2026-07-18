@@ -48,8 +48,15 @@ class AsmInstrumentedBytecodeVerificationTest {
 
     MethodCalls calls = methodCalls(outputDirectory, "successfulVoid", "()V");
 
-    assertTrue(calls.callsSystemNanoTime());
+    assertEquals(2, calls.countCall("java/lang/System", "nanoTime", "()J"));
+    assertEquals(
+        2,
+        calls.countCall(
+            "com/ll/metrics/latency/core/LatencyClocked", "enabled", "()Z"));
     assertTrue(calls.callsTimerRecord());
+    assertTrue(calls.firstEnabledCheckPrecedesEntryNanoTime());
+    assertTrue(calls.invocationEnabledLocalIsTestedBeforeExitEnabledCheck());
+    assertTrue(calls.exitEnabledCheckPrecedesTimerRecord());
   }
 
   @Test
@@ -101,6 +108,7 @@ class AsmInstrumentedBytecodeVerificationTest {
   private static MethodCalls methodCalls(Path outputDirectory, String methodName, String descriptor)
       throws IOException {
     List<MethodCall> calls = new ArrayList<>();
+    List<String> events = new ArrayList<>();
     boolean[] hasThrowInstruction = new boolean[1];
     Path classFile = outputDirectory.resolve(SAMPLE_CLASS_RESOURCE);
     try (InputStream inputStream = Files.newInputStream(classFile)) {
@@ -126,6 +134,21 @@ class AsmInstrumentedBytecodeVerificationTest {
                         String descriptor,
                         boolean isInterface) {
                       calls.add(new MethodCall(owner, name, descriptor));
+                      events.add("CALL " + owner + "." + name + descriptor);
+                    }
+
+                    @Override
+                    public void visitVarInsn(int opcode, int variable) {
+                      if (opcode == Opcodes.ILOAD) {
+                        events.add("ILOAD");
+                      }
+                    }
+
+                    @Override
+                    public void visitJumpInsn(int opcode, org.objectweb.asm.Label label) {
+                      if (opcode == Opcodes.IFEQ) {
+                        events.add("IFEQ");
+                      }
                     }
 
                     @Override
@@ -139,7 +162,7 @@ class AsmInstrumentedBytecodeVerificationTest {
               },
               ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
     }
-    return new MethodCalls(List.copyOf(calls), hasThrowInstruction[0]);
+    return new MethodCalls(List.copyOf(calls), List.copyOf(events), hasThrowInstruction[0]);
   }
 
   private static Path descriptor(Path outputDirectory) {
@@ -149,7 +172,18 @@ class AsmInstrumentedBytecodeVerificationTest {
         .resolve(LatencyClockedConstants.INSTRUMENTED_CLASS_INDEX_FILE);
   }
 
-  private record MethodCalls(List<MethodCall> calls, boolean hasThrowInstruction) {
+  private record MethodCalls(
+      List<MethodCall> calls, List<String> events, boolean hasThrowInstruction) {
+    private long countCall(String owner, String name, String descriptor) {
+      return calls.stream()
+          .filter(
+              call ->
+                  owner.equals(call.owner())
+                      && name.equals(call.name())
+                      && descriptor.equals(call.descriptor()))
+          .count();
+    }
+
     private boolean callsSystemNanoTime() {
       return calls.stream()
           .anyMatch(
@@ -160,10 +194,58 @@ class AsmInstrumentedBytecodeVerificationTest {
     private boolean callsTimerRecord() {
       return calls.stream()
           .anyMatch(
-              call ->
+                  call ->
                   "com/ll/metrics/latency/timer/Timer".equals(call.owner())
                       && "record".equals(call.name())
                       && "(J)V".equals(call.descriptor()));
+    }
+
+    private boolean firstEnabledCheckPrecedesEntryNanoTime() {
+      return indexOfCall("com/ll/metrics/latency/core/LatencyClocked", "enabled", "()Z", 0)
+          < indexOfCall("java/lang/System", "nanoTime", "()J", 0);
+    }
+
+    private boolean invocationEnabledLocalIsTestedBeforeExitEnabledCheck() {
+      int secondEnabled =
+          indexOfEvent(
+              "CALL com/ll/metrics/latency/core/LatencyClocked.enabled()Z", 1);
+      int loadLocal = events.indexOf("ILOAD");
+      int branch = events.indexOf("IFEQ");
+      return loadLocal >= 0 && branch > loadLocal && branch < secondEnabled;
+    }
+
+    private boolean exitEnabledCheckPrecedesTimerRecord() {
+      return indexOfCall("com/ll/metrics/latency/core/LatencyClocked", "enabled", "()Z", 1)
+          < indexOfCall("com/ll/metrics/latency/timer/Timer", "record", "(J)V", 0);
+    }
+
+    private int indexOfCall(String owner, String name, String descriptor, int occurrence) {
+      int found = 0;
+      for (int index = 0; index < calls.size(); index++) {
+        MethodCall call = calls.get(index);
+        if (owner.equals(call.owner())
+            && name.equals(call.name())
+            && descriptor.equals(call.descriptor())) {
+          if (found == occurrence) {
+            return index;
+          }
+          found++;
+        }
+      }
+      return -1;
+    }
+
+    private int indexOfEvent(String event, int occurrence) {
+      int found = 0;
+      for (int index = 0; index < events.size(); index++) {
+        if (event.equals(events.get(index))) {
+          if (found == occurrence) {
+            return index;
+          }
+          found++;
+        }
+      }
+      return -1;
     }
   }
 

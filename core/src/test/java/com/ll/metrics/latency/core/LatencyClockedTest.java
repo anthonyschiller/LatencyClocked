@@ -2,6 +2,7 @@ package com.ll.metrics.latency.core;
 
 import static com.ll.metrics.latency.test.TestUtils.resetLatencyClocked;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -13,6 +14,7 @@ import com.ll.metrics.latency.timer.InMemoryTimers;
 import com.ll.metrics.latency.timer.Timer;
 import com.ll.metrics.latency.timer.Timers;
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.lang.reflect.Field;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -26,6 +28,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import javax.management.Attribute;
+import javax.management.MBeanServer;
+import javax.management.ObjectName;
 import javax.tools.JavaCompiler;
 import javax.tools.ToolProvider;
 import org.junit.jupiter.api.AfterEach;
@@ -154,6 +159,30 @@ class LatencyClockedTest {
           Class<?> target = load("NullInputIndexTarget");
           assertNotNull(fieldValue(target, "timer"));
           assertEquals(1, fieldValue(target, "bindInvocations"));
+        });
+  }
+
+  @Test
+  void managementBeanExposesEnabledAttribute(@TempDir Path tempDir) throws Exception {
+    compileBindingFixture(tempDir, "ManagedIndexTarget", "timer", "service.managed");
+    writeIndex(tempDir, "ManagedIndexTarget");
+
+    withIndexClasspath(
+        tempDir,
+        () -> {
+          LatencyClocked.initialise(InMemoryTimers.create());
+          MBeanServer mbeanServer = ManagementFactory.getPlatformMBeanServer();
+          ObjectName objectName = new ObjectName(LatencyClockedConstants.MBEAN_NAME);
+
+          assertEquals(LatencyClocked.enabled(), mbeanServer.getAttribute(objectName, "Enabled"));
+
+          mbeanServer.setAttribute(objectName, new Attribute("Enabled", false));
+          assertFalse(LatencyClocked.enabled());
+          assertEquals(false, mbeanServer.getAttribute(objectName, "Enabled"));
+
+          mbeanServer.setAttribute(objectName, new Attribute("Enabled", true));
+          assertTrue(LatencyClocked.enabled());
+          assertEquals(true, mbeanServer.getAttribute(objectName, "Enabled"));
         });
   }
 
@@ -519,7 +548,7 @@ class LatencyClockedTest {
   }
 
   @Test
-  void initialiseDoesNotLoadIndexesWhenDisabled(@TempDir Path tempDir) throws Exception {
+  void initialiseBindsIndexesWhenRecordingIsDisabled(@TempDir Path tempDir) throws Exception {
     compileFixture(
         tempDir,
         "DisabledIndexTarget",
@@ -534,7 +563,7 @@ class LatencyClockedTest {
           }
         }
         """);
-    writeIndex(tempDir, "not|a|class\nDisabledIndexTarget");
+    writeIndex(tempDir, "DisabledIndexTarget");
     System.setProperty(LatencyClockedConstants.ENABLED_PROPERTY, "false");
 
     withIndexClasspath(
@@ -542,7 +571,7 @@ class LatencyClockedTest {
         () -> {
           LatencyClocked latencyClocked = LatencyClocked.initialise();
           assertTrue(latencyClocked.snapshots().isEmpty());
-          assertEquals(0, fieldValue(load("DisabledIndexTarget"), "bindInvocations"));
+          assertEquals(1, fieldValue(load("DisabledIndexTarget"), "bindInvocations"));
         });
   }
 
@@ -662,22 +691,21 @@ class LatencyClockedTest {
     Files.writeString(index, content);
   }
 
-  private void withIndexClasspath(Path firstRoot, ThrowingRunnable runnable)
-      throws IOException {
+  private void withIndexClasspath(Path firstRoot, ThrowingRunnable runnable) throws Exception {
     withIndexClasspath(new Path[] {firstRoot}, runnable);
   }
 
   private LatencyClocked withIndexClasspath(Path firstRoot, ThrowingInitialise initialise)
-      throws IOException {
+      throws Exception {
     return withIndexClasspath(new Path[] {firstRoot}, initialise);
   }
 
   private void withIndexClasspath(Path firstRoot, Path secondRoot, ThrowingRunnable runnable)
-      throws IOException {
+      throws Exception {
     withIndexClasspath(new Path[] {firstRoot, secondRoot}, runnable);
   }
 
-  private void withIndexClasspath(Path[] roots, ThrowingRunnable runnable) throws IOException {
+  private void withIndexClasspath(Path[] roots, ThrowingRunnable runnable) throws Exception {
     withIndexClasspath(
         roots,
         () -> {
@@ -687,7 +715,7 @@ class LatencyClockedTest {
   }
 
   private LatencyClocked withIndexClasspath(Path[] roots, ThrowingInitialise initialise)
-      throws IOException {
+      throws Exception {
     URL[] urls = new URL[roots.length];
     for (int i = 0; i < roots.length; i++) {
       urls[i] = roots[i].toUri().toURL();
@@ -700,7 +728,7 @@ class LatencyClockedTest {
   }
 
   private LatencyClocked withContextClassLoader(
-      ClassLoader classLoader, ThrowingInitialise initialise) {
+      ClassLoader classLoader, ThrowingInitialise initialise) throws Exception {
     Thread currentThread = Thread.currentThread();
     ClassLoader previousClassLoader = currentThread.getContextClassLoader();
     currentThread.setContextClassLoader(classLoader);
@@ -806,11 +834,11 @@ class LatencyClockedTest {
 
   @FunctionalInterface
   private interface ThrowingRunnable {
-    void run();
+    void run() throws Exception;
   }
 
   @FunctionalInterface
   private interface ThrowingInitialise {
-    LatencyClocked run();
+    LatencyClocked run() throws Exception;
   }
 }

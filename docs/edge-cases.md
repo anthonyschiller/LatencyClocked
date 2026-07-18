@@ -50,8 +50,9 @@ Startup lifecycle cases:
 - Concurrent startup calls are serialized; same-thread recursive startup is rejected.
 - Calling an instrumented method before startup binding fails with an actionable
   `IllegalStateException` when LatencyClocked is enabled.
-- Calling an instrumented method while `latency-clocked.enabled=false` bypasses generated
-  timing code.
+- Calling an instrumented method while `latency-clocked.enabled=false` or JMX `Enabled=false`
+  bypasses generated timing code. An invocation records only if recording is enabled at entry
+  and remains enabled at successful exit.
 - A method timer represents only complete successful executions of one `@Timed` method.
   `@Timed` is intentionally a marker annotation, so timer ownership is always method-scoped.
 

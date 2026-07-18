@@ -99,8 +99,13 @@ Histogram is used internally by `latency-clocked-hdr`; histogram types are not p
 `LatencyClocked.initialise()` uses lower-overhead single-writer HDR timers, and
 `LatencyClocked.initialisedThreadSafe()` uses HDR `ConcurrentHistogram` timers.
 
-Set `-Dlatency-clocked.enabled=false` to disable generated timer binding at startup. Instrumented
-methods bypass generated timing while `LatencyClocked.enabled()` is false.
+Set `-Dlatency-clocked.enabled=false` to start with latency recording disabled. Startup still
+binds generated timer fields, so recording can later be enabled dynamically through JMX. The
+global JMX object name is `com.ll.metrics.latency:type=LatencyClocked`, with a writable
+`Enabled` attribute.
+
+An invocation is recorded only when recording is enabled at method entry and still enabled at
+successful method exit. If recording is disabled at either boundary, that invocation is discarded.
 
 ## Supported Methods
 

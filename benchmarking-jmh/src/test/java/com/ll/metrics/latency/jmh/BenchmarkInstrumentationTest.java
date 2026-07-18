@@ -3,7 +3,6 @@ package com.ll.metrics.latency.jmh;
 import static com.ll.metrics.latency.test.TestUtils.resetLatencyClocked;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.ll.metrics.latency.constants.LatencyClockedConstants;
@@ -45,6 +44,7 @@ class BenchmarkInstrumentationTest {
     previousRegistries.forEach(Metrics::addRegistry);
     previousRegistries.clear();
     resetLatencyClocked();
+    System.setProperty(LatencyClockedConstants.ENABLED_PROPERTY, "true");
   }
 
   @Test
@@ -113,7 +113,6 @@ class BenchmarkInstrumentationTest {
   @Test
   void whenLatencyClockedDisabledThenTimingCaptureIsNoOp() throws Exception {
     clearGeneratedTimerFields(LatencyClockedBenchmark.LatencyClockedDisabledTarget.class);
-    String previous = System.getProperty(LatencyClockedConstants.ENABLED_PROPERTY);
     InMemoryTimers timers = InMemoryTimers.create();
     try {
       System.setProperty(LatencyClockedConstants.ENABLED_PROPERTY, "false");
@@ -126,10 +125,10 @@ class BenchmarkInstrumentationTest {
       target.objectReturn();
       LatencyClockedBenchmark.LatencyClockedDisabledTarget.staticCall();
 
-      assertTrue(timers.snapshots().isEmpty());
-      assertGeneratedTimerFieldsAreNull(LatencyClockedBenchmark.LatencyClockedDisabledTarget.class);
+      assertTrue(timers.snapshots().stream().allMatch(snapshot -> snapshot.count() == 0));
+      assertGeneratedTimerFieldsAreBound(
+          LatencyClockedBenchmark.LatencyClockedDisabledTarget.class);
     } finally {
-      restoreEnabledProperty(previous);
       clearGeneratedTimerFields(LatencyClockedBenchmark.LatencyClockedDisabledTarget.class);
     }
   }
@@ -153,22 +152,13 @@ class BenchmarkInstrumentationTest {
     }
   }
 
-  private static void assertGeneratedTimerFieldsAreNull(Class<?> targetClass) throws Exception {
+  private static void assertGeneratedTimerFieldsAreBound(Class<?> targetClass) throws Exception {
     for (Field field : targetClass.getDeclaredFields()) {
       if (field.getName().startsWith(LatencyClockedConstants.TIMER_FIELD_PREFIX)
           && Timer.class.isAssignableFrom(field.getType())) {
         field.setAccessible(true);
-        assertNull(field.get(null), "Expected disabled timer field to remain null: " + field);
+        assertNotNull(field.get(null), "Expected disabled timer field to be bound: " + field);
       }
     }
-  }
-
-  private static void restoreEnabledProperty(String previous) {
-    if (previous == null) {
-      System.clearProperty(LatencyClockedConstants.ENABLED_PROPERTY);
-    } else {
-      System.setProperty(LatencyClockedConstants.ENABLED_PROPERTY, previous);
-    }
-    LatencyClocked.initialise(InMemoryTimers.create());
   }
 }

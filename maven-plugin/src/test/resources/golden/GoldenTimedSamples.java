@@ -1,6 +1,11 @@
 package golden;
 
 import com.ll.metrics.latency.annotations.Timed;
+import com.ll.metrics.latency.constants.LatencyClockedConstants;
+import com.ll.metrics.latency.core.LatencyClocked;
+import java.lang.management.ManagementFactory;
+import javax.management.Attribute;
+import javax.management.ObjectName;
 
 public final class GoldenTimedSamples {
   public int sideEffect;
@@ -140,6 +145,18 @@ public final class GoldenTimedSamples {
   public synchronized int synchronizedTimedMethod(int value) {
     sideEffect += 9;
     return value + 9;
+  }
+
+  @Timed
+  public void toggleEnabled() {
+    try {
+      ManagementFactory.getPlatformMBeanServer()
+          .setAttribute(
+              new ObjectName(LatencyClockedConstants.MBEAN_NAME),
+              new Attribute("Enabled", !LatencyClocked.enabled()));
+    } catch (javax.management.JMException e) {
+      throw new IllegalStateException(e);
+    }
   }
 
   @Timed

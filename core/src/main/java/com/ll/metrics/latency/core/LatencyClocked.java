@@ -7,6 +7,7 @@ import com.ll.metrics.latency.timer.Timers;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.lang.management.ManagementFactory;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -19,6 +20,11 @@ import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
+import javax.management.InstanceAlreadyExistsException;
+import javax.management.JMException;
+import javax.management.MBeanServer;
+import javax.management.ObjectName;
+import javax.management.StandardMBean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,6 +35,7 @@ public final class LatencyClocked {
   private static Timers owner;
   private static boolean initialising;
   private static boolean initialised;
+  private static boolean managementRegistered;
   private static volatile boolean enabled = isEnabledPropertySet();
 
   private LatencyClocked() {}
@@ -62,14 +69,7 @@ public final class LatencyClocked {
    */
   public static LatencyClocked initialise(Timers timers) {
     Objects.requireNonNull(timers, "timers");
-    enabled = isEnabledPropertySet();
     LatencyClocked latencyClocked = new LatencyClocked();
-    if (!enabled()) {
-      LOGGER.info(
-          "LatencyClocked disabled by system property {}=false",
-          LatencyClockedConstants.ENABLED_PROPERTY);
-      return latencyClocked;
-    }
 
     ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
     if (classLoader == null) {
@@ -88,6 +88,12 @@ public final class LatencyClocked {
 
       if (owner == null) {
         owner = timers;
+        enabled = isEnabledPropertySet();
+        if (!enabled()) {
+          LOGGER.info(
+              "LatencyClocked recording disabled by system property {}=false",
+              LatencyClockedConstants.ENABLED_PROPERTY);
+        }
       } else {
         requireSameOwner(timers);
       }
@@ -95,6 +101,7 @@ public final class LatencyClocked {
       initialising = true;
       try {
         bindInstrumentedClasses(classLoader);
+        registerManagementBean();
         initialised = true;
         return latencyClocked;
       } finally {
@@ -141,9 +148,11 @@ public final class LatencyClocked {
 
   private static void resetForTests() {
     synchronized (INITIALISATION_LOCK) {
+      unregisterManagementBean();
       owner = null;
       initialising = false;
       initialised = false;
+      managementRegistered = false;
       enabled = isEnabledPropertySet();
     }
   }
@@ -179,6 +188,70 @@ public final class LatencyClocked {
    */
   public static boolean enabled() {
     return enabled;
+  }
+
+  /**
+   * Enables or disables generated latency recording.
+   *
+   * <p>This mutates the same volatile state read by generated instrumentation and by the
+   * LatencyClocked JMX management bean.
+   *
+   * @param enabled true to enable recording, false to discard timed invocations
+   */
+  public static void setEnabled(boolean enabled) {
+    LatencyClocked.enabled = enabled;
+  }
+
+  private static void registerManagementBean() {
+    if (managementRegistered) {
+      return;
+    }
+    try {
+      ObjectName objectName = new ObjectName(LatencyClockedConstants.MBEAN_NAME);
+      MBeanServer mbeanServer = ManagementFactory.getPlatformMBeanServer();
+      if (mbeanServer.isRegistered(objectName)) {
+        throw new IllegalStateException(
+            "JMX object name "
+                + LatencyClockedConstants.MBEAN_NAME
+                + " is already registered by another component");
+      }
+      mbeanServer.registerMBean(
+          new StandardMBean(
+              new LatencyClockedManagement(), LatencyClockedManagementBean.class, true),
+          objectName);
+      managementRegistered = true;
+      LOGGER.debug("Registered LatencyClocked management bean as {}", objectName);
+    } catch (InstanceAlreadyExistsException e) {
+      throw new IllegalStateException(
+          "JMX object name "
+              + LatencyClockedConstants.MBEAN_NAME
+              + " was registered before LatencyClocked could register it",
+          e);
+    } catch (JMException e) {
+      throw new IllegalStateException(
+          "Failed to register LatencyClocked management bean "
+              + LatencyClockedConstants.MBEAN_NAME,
+          e);
+    }
+  }
+
+  private static void unregisterManagementBean() {
+    if (!managementRegistered) {
+      return;
+    }
+    try {
+      ObjectName objectName = new ObjectName(LatencyClockedConstants.MBEAN_NAME);
+      MBeanServer mbeanServer = ManagementFactory.getPlatformMBeanServer();
+      if (mbeanServer.isRegistered(objectName)) {
+        mbeanServer.unregisterMBean(objectName);
+      }
+      managementRegistered = false;
+    } catch (JMException e) {
+      throw new IllegalStateException(
+          "Failed to unregister LatencyClocked management bean "
+              + LatencyClockedConstants.MBEAN_NAME,
+          e);
+    }
   }
 
   private static boolean isEnabledPropertySet() {

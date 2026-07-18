@@ -27,8 +27,19 @@ attempt to finish and then re-evaluate the resulting state.
 Invoking an instrumented method before startup binding fails clearly while latency recording is
 enabled.
 
-`latency-clocked.enabled=false` disables instrumented class-index loading and generated timing. 
-Instrumented methods branch around their injected timing code while disabled.
+`latency-clocked.enabled=false` starts the runtime with latency recording disabled. Startup still
+loads instrumented class indexes and binds generated timer fields, which lets operators enable
+recording later without restarting the application.
+
+The enabled state is exposed through JMX as object name
+`com.ll.metrics.latency:type=LatencyClocked`, attribute `Enabled`. Updating that attribute changes
+the same volatile flag read by generated instrumentation; generated code does not call through JMX.
+
+An individual invocation records only when recording was enabled at method entry and remains
+enabled at successful method exit. If recording is disabled at either boundary, the invocation is
+discarded. The entry check avoids `System.nanoTime()` while disabled; the exit check avoids timer
+access, binding checks, `System.nanoTime()`, and `Timer.record(...)` after recording has been
+disabled.
 
 Snapshots are read through the returned `LatencyClocked` handle. Advanced tests or custom timer
 catalogues may also read through `Timers.snapshots()`. Snapshot latency values are nanoseconds

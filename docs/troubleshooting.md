@@ -74,8 +74,9 @@ method instrumentation are detected and skipped. The class index is written dete
 
 Symptom: no generated timings are recorded even though methods are instrumented.
 
-Cause: `latency-clocked.enabled=false` disables instrumented class-index loading and generated
-timing code.
+Cause: `latency-clocked.enabled=false` disables generated recording, or the JMX `Enabled`
+attribute has been set to `false`. Startup still binds generated timer fields while disabled so
+recording can be enabled later.
 
-Fix: remove the property or set it to `true`, then call `LatencyClocked.initialise(...)`
-during startup.
+Fix: remove the property, set it to `true`, or set JMX attribute
+`com.ll.metrics.latency:type=LatencyClocked` / `Enabled` to `true`.

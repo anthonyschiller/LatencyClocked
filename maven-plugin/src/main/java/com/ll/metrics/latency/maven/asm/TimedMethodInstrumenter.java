@@ -10,6 +10,7 @@ import org.objectweb.asm.commons.AdviceAdapter;
 final class TimedMethodInstrumenter extends AdviceAdapter {
   private final String internalClassName;
   private final TimedMethodDescriptorEntry timedMethod;
+  private int enabledLocal;
   private int startLocal;
 
   TimedMethodInstrumenter(
@@ -26,11 +27,17 @@ final class TimedMethodInstrumenter extends AdviceAdapter {
 
   @Override
   protected void onMethodEnter() {
+    enabledLocal = newLocal(Type.BOOLEAN_TYPE);
     startLocal = newLocal(Type.LONG_TYPE);
+
+    invokeStatic(AsmConstants.LATENCY_CLOCKED_TYPE, AsmConstants.ENABLED);
+    storeLocal(enabledLocal, Type.BOOLEAN_TYPE);
+
     push(0L);
     storeLocal(startLocal, Type.LONG_TYPE);
+
     Label skip = newLabel();
-    invokeStatic(AsmConstants.LATENCY_CLOCKED_TYPE, AsmConstants.ENABLED);
+    loadLocal(enabledLocal, Type.BOOLEAN_TYPE);
     visitJumpInsn(Opcodes.IFEQ, skip);
     invokeStatic(AsmConstants.SYSTEM_TYPE, AsmConstants.NANO_TIME);
     storeLocal(startLocal, Type.LONG_TYPE);
@@ -43,6 +50,8 @@ final class TimedMethodInstrumenter extends AdviceAdapter {
       return;
     }
     final Label skip = newLabel();
+    loadLocal(enabledLocal, Type.BOOLEAN_TYPE);
+    visitJumpInsn(Opcodes.IFEQ, skip);
     invokeStatic(AsmConstants.LATENCY_CLOCKED_TYPE, AsmConstants.ENABLED);
     visitJumpInsn(Opcodes.IFEQ, skip);
     visitFieldInsn(

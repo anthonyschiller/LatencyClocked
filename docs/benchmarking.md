@@ -37,7 +37,7 @@ The benchmark module covers:
 
 - Plain method call baselines.
 - Latency-clocked void, primitive-return, object-return, and static methods.
-- Latency-clocked disabled-startup void, primitive-return, object-return, and static
+- Latency-clocked disabled-recording void, primitive-return, object-return, and static
   methods using `-Dlatency-clocked.enabled=false` semantics.
 - Micrometer `@Timed` void, primitive-return, object-return, and static methods woven by
   AspectJ compile-time weaving.
@@ -70,7 +70,7 @@ The comparison is intentionally semantic, not product-equivalence based:
 - Micrometer `TimedAspect` records exceptional completion with an exception tag.
 - Micrometer records through `MeterRegistry` and its broader meter abstraction.
 - LatencyClocked records directly into a generated, startup-bound static timer field.
-- When `latency-clocked.enabled=false`, startup binding is skipped and generated methods
+- When `latency-clocked.enabled=false`, startup binding still occurs and generated methods
   bypass their injected timing code through `LatencyClocked.enabled()`.
 - Micrometer `TimedAspect` performs its normal steady-state meter resolution inside advice;
   the source-level benchmark method does not perform registry lookup itself.

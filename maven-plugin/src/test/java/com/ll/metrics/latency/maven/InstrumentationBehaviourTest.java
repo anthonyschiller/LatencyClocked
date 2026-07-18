@@ -13,6 +13,7 @@ import com.ll.metrics.latency.snapshot.TimerSnapshot;
 import com.ll.metrics.latency.timer.InMemoryTimers;
 import com.ll.metrics.latency.timer.Timers;
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -22,6 +23,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import javax.management.Attribute;
+import javax.management.ObjectName;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -265,14 +268,14 @@ class InstrumentationBehaviourTest {
     compileGolden(outputDirectory);
     InstrumentationResult first = instrument(outputDirectory);
 
-    assertEquals(18, first.injectionResult().instrumentedMethods());
+    assertEquals(19, first.injectionResult().instrumentedMethods());
     assertEquals(0, first.injectionResult().skippedInstrumentedMethods());
     String firstIndex = Files.readString(descriptor(outputDirectory));
 
     InstrumentationResult second = instrument(outputDirectory);
 
     assertEquals(0, second.injectionResult().instrumentedMethods());
-    assertEquals(18, second.injectionResult().skippedInstrumentedMethods());
+    assertEquals(19, second.injectionResult().skippedInstrumentedMethods());
     String secondIndex = Files.readString(descriptor(outputDirectory));
     assertEquals(firstIndex, secondIndex);
 
@@ -362,11 +365,59 @@ class InstrumentationBehaviourTest {
 
         invoke(instance, "successfulVoid");
 
-        assertTrue(timers.snapshots().isEmpty());
+        assertEquals(0, snapshot(timers, "successfulVoid").count());
       } finally {
         restoreEnabledProperty(previousEnabledProperty);
         currentThread.setContextClassLoader(previousClassLoader);
       }
+    }
+  }
+
+  @Test
+  void enabledAtEntryAndExitRecordsOnce(@TempDir Path outputDirectory) throws Exception {
+    try (RuntimeFixture fixture = instrumentAndLoad(outputDirectory)) {
+      setEnabledThroughJmx(true);
+      Object instance = fixture.newInstance();
+
+      invoke(instance, "successfulVoid");
+
+      assertEquals(1, snapshot(fixture.timers(), "successfulVoid").count());
+    }
+  }
+
+  @Test
+  void disabledAtEntryAndExitDoesNotRecord(@TempDir Path outputDirectory) throws Exception {
+    try (RuntimeFixture fixture = instrumentAndLoad(outputDirectory)) {
+      setEnabledThroughJmx(false);
+      Object instance = fixture.newInstance();
+
+      invoke(instance, "successfulVoid");
+
+      assertEquals(0, snapshot(fixture.timers(), "successfulVoid").count());
+    }
+  }
+
+  @Test
+  void enabledAtEntryDisabledAtExitDoesNotRecord(@TempDir Path outputDirectory) throws Exception {
+    try (RuntimeFixture fixture = instrumentAndLoad(outputDirectory)) {
+      setEnabledThroughJmx(true);
+      Object instance = fixture.newInstance();
+
+      invoke(instance, "toggleEnabled");
+
+      assertEquals(0, snapshot(fixture.timers(), "toggleEnabled").count());
+    }
+  }
+
+  @Test
+  void disabledAtEntryEnabledAtExitDoesNotRecord(@TempDir Path outputDirectory) throws Exception {
+    try (RuntimeFixture fixture = instrumentAndLoad(outputDirectory)) {
+      setEnabledThroughJmx(false);
+      Object instance = fixture.newInstance();
+
+      invoke(instance, "toggleEnabled");
+
+      assertEquals(0, snapshot(fixture.timers(), "toggleEnabled").count());
     }
   }
 
@@ -442,6 +493,13 @@ class InstrumentationBehaviourTest {
     return field.get(target);
   }
 
+  private static void setEnabledThroughJmx(boolean enabled) throws Exception {
+    ManagementFactory.getPlatformMBeanServer()
+        .setAttribute(
+            new ObjectName(LatencyClockedConstants.MBEAN_NAME),
+            new Attribute("Enabled", enabled));
+  }
+
   private static TimerSnapshot snapshot(Timers timers, String timerName) {
     return timers.snapshots().stream()
         .filter(snapshot -> snapshot.id().startsWith(methodIdPrefix(timerName)))
@@ -465,10 +523,10 @@ class InstrumentationBehaviourTest {
     if (previousEnabledProperty == null) {
       System.clearProperty(LatencyClockedConstants.ENABLED_PROPERTY);
     } else {
-      System.setProperty(
-          LatencyClockedConstants.ENABLED_PROPERTY, previousEnabledProperty);
+      System.setProperty(LatencyClockedConstants.ENABLED_PROPERTY, previousEnabledProperty);
     }
-    LatencyClocked.initialise(InMemoryTimers.create());
+    LatencyClocked.setEnabled(
+        !"false".equalsIgnoreCase(System.getProperty(LatencyClockedConstants.ENABLED_PROPERTY)));
   }
 
   private record InstrumentationResult(

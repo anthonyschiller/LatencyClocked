@@ -81,25 +81,27 @@ public class LatencyClockedBenchmark {
 
   @Benchmark
   public void latencyClockedDisabledVoidCall(
-      LatencyClockedDisabledBindingState bindingState, LatencyClockedDisabledThreadState state) {
+      LatencyClockedRecordingDisabledState bindingState,
+      LatencyClockedDisabledThreadState state) {
     state.target.voidCall();
   }
 
   @Benchmark
   public int latencyClockedDisabledPrimitiveReturn(
-      LatencyClockedDisabledBindingState bindingState, LatencyClockedDisabledThreadState state) {
+      LatencyClockedRecordingDisabledState bindingState,
+      LatencyClockedDisabledThreadState state) {
     return state.target.primitiveReturn();
   }
 
   @Benchmark
   public Object latencyClockedDisabledObjectReturn(
-      LatencyClockedDisabledBindingState bindingState, LatencyClockedDisabledThreadState state) {
+      LatencyClockedRecordingDisabledState bindingState,
+      LatencyClockedDisabledThreadState state) {
     return state.target.objectReturn();
   }
 
   @Benchmark
-  public void latencyClockedDisabledStaticCall(
-      LatencyClockedDisabledBindingState bindingState) {
+  public void latencyClockedDisabledStaticCall(LatencyClockedRecordingDisabledState bindingState) {
     LatencyClockedDisabledTarget.staticCall();
   }
 
@@ -179,12 +181,12 @@ public class LatencyClockedBenchmark {
     }
   }
 
-  /** Benchmark-scoped disabled startup path for latency-clocked timers. */
+  /** Benchmark-scoped disabled recording path for latency-clocked timers. */
   @State(Scope.Benchmark)
-  public static class LatencyClockedDisabledBindingState {
+  public static class LatencyClockedRecordingDisabledState {
     private String previousEnabledProperty;
 
-    /** Disables startup binding and calls the normal startup API. */
+    /** Starts latency-clocked normally with recording disabled. */
     @Setup(Level.Trial)
     public void setup() {
       previousEnabledProperty = System.getProperty(LatencyClockedConstants.ENABLED_PROPERTY);
@@ -200,7 +202,8 @@ public class LatencyClockedBenchmark {
       } else {
         System.setProperty(LatencyClockedConstants.ENABLED_PROPERTY, previousEnabledProperty);
       }
-      LatencyClocked.initialise();
+      LatencyClocked.setEnabled(
+          !"false".equalsIgnoreCase(System.getProperty(LatencyClockedConstants.ENABLED_PROPERTY)));
     }
   }
 
@@ -215,7 +218,7 @@ public class LatencyClockedBenchmark {
     }
   }
 
-  /** Per-thread latency-clocked invocation target used with disabled startup binding. */
+  /** Per-thread latency-clocked invocation target used with disabled recording. */
   @State(Scope.Thread)
   public static class LatencyClockedDisabledThreadState {
     private LatencyClockedDisabledTarget target;

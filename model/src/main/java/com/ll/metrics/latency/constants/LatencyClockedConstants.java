@@ -25,6 +25,8 @@ public final class LatencyClockedConstants {
           + INSTRUMENTED_CLASS_INDEX_FILE;
   /** System property used to disable startup binding and generated timing. */
   public static final String ENABLED_PROPERTY = "latency-clocked.enabled";
+  /** Stable JMX object name for the global LatencyClocked runtime control. */
+  public static final String MBEAN_NAME = "com.ll.metrics.latency:type=LatencyClocked";
   /** Generated bind method name. */
   public static final String BIND_METHOD = "__latency_clocked$bind";
   /** Prefix for generated timer field names. */
