@@ -1,21 +1,33 @@
 package com.ll.metrics.latency.example;
 
+import static com.ll.metrics.latency.test.TestUtils.resetLatencyClocked;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.ll.metrics.latency.core.LatencyClocked;
-import com.ll.metrics.latency.hdr.HdrTimers;
 import com.ll.metrics.latency.snapshot.TimerSnapshot;
-import com.ll.metrics.latency.timer.Timers;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 class ExampleApplicationTest {
+
+  @BeforeEach
+  void setUp() {
+    resetLatencyClocked();
+  }
+
+  @AfterEach
+  void tearDown() {
+    resetLatencyClocked();
+  }
+
   @Test
   void exampleRecordsInstanceStaticAndOverloadedMethods() {
     final LatencyClocked lc = LatencyClocked.initialise();
