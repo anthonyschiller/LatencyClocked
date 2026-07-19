@@ -33,7 +33,7 @@ final class BindMethodInjector {
       methodVisitor.visitFieldInsn(
           Opcodes.PUTSTATIC,
           internalClassName,
-          timedMethod.fieldName(),
+          timedMethod.timerFieldName(),
           AsmConstants.TIMER_DESCRIPTOR);
     }
     methodVisitor.visitInsn(Opcodes.RETURN);

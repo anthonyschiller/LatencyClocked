@@ -151,7 +151,7 @@ class LatencyClockedInstrumenterTest {
             "__latency_clocked_timer_3",
             "__latency_clocked_timer_4"),
         sampleTimedMethods.stream()
-            .map(TimedMethodDescriptorEntry::fieldName)
+            .map(TimedMethodDescriptorEntry::timerFieldName)
             .collect(Collectors.toSet()));
   }
 
@@ -241,7 +241,7 @@ class LatencyClockedInstrumenterTest {
     assertEquals(5, timedMethods.size());
     TimedMethodDescriptorEntry timedMethod = timedMethods.getFirst();
     FieldInfo field =
-        requiredField(outputDirectory, SampleTimedClass.class, timedMethod.fieldName());
+        requiredField(outputDirectory, SampleTimedClass.class, timedMethod.timerFieldName());
     assertEquals("__latency_clocked_timer_0", field.name());
     assertTrue(field.isStatic());
     assertTrue(field.isSynthetic());
@@ -290,7 +290,7 @@ class LatencyClockedInstrumenterTest {
             .findFirst()
             .orElseThrow();
     FieldInfo field =
-        requiredField(outputDirectory, SampleTimedClass.class, staticTimedMethod.fieldName());
+        requiredField(outputDirectory, SampleTimedClass.class, staticTimedMethod.timerFieldName());
     assertTrue(field.isStatic());
     assertEquals(Type.getDescriptor(Timer.class), field.descriptor());
   }
@@ -322,7 +322,7 @@ class LatencyClockedInstrumenterTest {
     bindMethod.setAccessible(true);
     bindMethod.invoke(null, timers);
 
-    Field field = instrumentedClass.getDeclaredField(timedMethod.fieldName());
+    Field field = instrumentedClass.getDeclaredField(timedMethod.timerFieldName());
     field.setAccessible(true);
     assertEquals(timers.claim(timedMethod.timerId()), field.get(null));
   }

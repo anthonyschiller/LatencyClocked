@@ -103,7 +103,7 @@ final class LatencyClockedInstrumenter {
         className,
         method.methodName(),
         method.methodDescriptor(),
-        method.generatedFieldName(),
+        method.generatedTimerFieldName(),
         method.resolvedTimerId());
   }
 
@@ -166,7 +166,7 @@ final class LatencyClockedInstrumenter {
     lines.add("instrumentedMethods=" + injectionResult.instrumentedMethods());
     lines.add("skippedInstrumentedMethods=" + injectionResult.skippedInstrumentedMethods());
     lines.add("");
-    lines.add("status|className|methodName|methodDescriptor|fieldName|timerId|classFile");
+    lines.add("status|className|methodName|methodDescriptor|timerFieldName|timerId|classFile");
     for (Map.Entry<Path, List<TimedMethodDescriptorEntry>> classEntry :
         timedMethodsByClassFile.entrySet()) {
       for (TimedMethodDescriptorEntry timedMethod : classEntry.getValue()) {
@@ -177,7 +177,7 @@ final class LatencyClockedInstrumenter {
                 timedMethod.className(),
                 timedMethod.methodName(),
                 timedMethod.methodDescriptor(),
-                timedMethod.fieldName(),
+                timedMethod.timerFieldName(),
                 timedMethod.timerId(),
                 classEntry.getKey().toString()));
       }

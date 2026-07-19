@@ -60,7 +60,7 @@ final class AlreadyInstrumentedMethodScanner extends ClassVisitor {
         if (sawGeneratedTimerField
             && opcode == Opcodes.INVOKEINTERFACE
             && AsmConstants.TIMER_INTERNAL_NAME.equals(owner)
-            && "record".equals(name)
+            && AsmConstants.TIMER_RECORD_METHOD_NAME.equals(name)
             && "(J)V".equals(descriptor)) {
           instrumentedMethods.add(methodKey);
           sawGeneratedTimerField = false;
@@ -79,7 +79,7 @@ final class AlreadyInstrumentedMethodScanner extends ClassVisitor {
       public void visitFieldInsn(int opcode, String owner, String fieldName, String descriptor) {
         if (opcode == Opcodes.GETSTATIC
             && visitedClassName.equals(owner)
-            && timedMethod.fieldName().equals(fieldName)
+            && timedMethod.timerFieldName().equals(fieldName)
             && AsmConstants.TIMER_DESCRIPTOR.equals(descriptor)) {
           sawGeneratedTimerField = true;
         }

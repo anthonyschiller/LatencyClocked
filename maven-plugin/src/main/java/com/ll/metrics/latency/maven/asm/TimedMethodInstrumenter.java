@@ -30,6 +30,14 @@ final class TimedMethodInstrumenter extends AdviceAdapter {
     enabledLocal = newLocal(Type.BOOLEAN_TYPE);
     startLocal = newLocal(Type.LONG_TYPE);
 
+    /*
+     * Entry timing is intentionally inserted before we know whether this invocation will
+     * return normally. Given @Timed should not be applied to methods can only terminate with an
+     * exception (for example see bytecode test
+     * noTimeRecordingRunsForMethodThatCanOnlyExitExceptionally) this is justified and avoids the
+     * complexity of the control-flow analysis that would be required to evaluate whether to inject
+     * this instrumentation or not.
+     */
     invokeStatic(AsmConstants.LATENCY_CLOCKED_TYPE, AsmConstants.ENABLED);
     storeLocal(enabledLocal, Type.BOOLEAN_TYPE);
 
@@ -57,7 +65,7 @@ final class TimedMethodInstrumenter extends AdviceAdapter {
     visitFieldInsn(
         Opcodes.GETSTATIC,
         internalClassName,
-        timedMethod.fieldName(),
+        timedMethod.timerFieldName(),
         AsmConstants.TIMER_DESCRIPTOR);
     ensureTimerIsBound();
     invokeStatic(AsmConstants.SYSTEM_TYPE, AsmConstants.NANO_TIME);
@@ -78,7 +86,7 @@ final class TimedMethodInstrumenter extends AdviceAdapter {
 
   private String uninitialisedTimerMessage() {
     return "LatencyClocked timer field "
-        + timedMethod.fieldName()
+        + timedMethod.timerFieldName()
         + " for "
         + timedMethod.className()
         + "#"

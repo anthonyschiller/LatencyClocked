@@ -218,6 +218,44 @@ class InstrumentationBehaviourTest {
   }
 
   @Test
+  void latencyRecordedForSuccessfulReturnPathsButNotForExitsWithException(
+      @TempDir Path outputDirectory)
+      throws Exception {
+    try (RuntimeFixture fixture = instrumentAndLoad(outputDirectory)) {
+      Object instance = fixture.newInstance();
+
+      assertEquals(42, invoke(instance, "maybeThrow", boolean.class, false));
+      InvocationTargetException exception =
+          assertThrows(
+              InvocationTargetException.class,
+              () -> invoke(instance, "maybeThrow", boolean.class, true));
+
+      assertInstanceOf(IllegalStateException.class, exception.getCause());
+      assertEquals(1, snapshot(fixture.timers(), "maybeThrow").count());
+    }
+  }
+
+  @Test
+  void terminalThrowDoesNotPreventEarlierSuccessfulReturnPathsRecording(
+      @TempDir Path outputDirectory) throws Exception {
+    try (RuntimeFixture fixture = instrumentAndLoad(outputDirectory)) {
+      Object instance = fixture.newInstance();
+
+      assertEquals(-1, invoke(instance, "exceptionThrownIfValueUnhandled", int.class, -1));
+      assertEquals(0, invoke(instance, "exceptionThrownIfValueUnhandled", int.class, 0));
+      InvocationTargetException exception =
+          assertThrows(
+              InvocationTargetException.class,
+              () -> invoke(instance, "exceptionThrownIfValueUnhandled", int.class, 1));
+
+      assertInstanceOf(IllegalStateException.class, exception.getCause());
+      assertEquals(
+          2,
+          snapshot(fixture.timers(), "exceptionThrownIfValueUnhandled").count());
+    }
+  }
+
+  @Test
   void privateFinalAndSynchronizedTimedMethodsRecord(@TempDir Path outputDirectory)
       throws Exception {
     try (RuntimeFixture fixture = instrumentAndLoad(outputDirectory)) {
@@ -270,14 +308,14 @@ class InstrumentationBehaviourTest {
     compileGolden(outputDirectory);
     InstrumentationResult first = instrument(outputDirectory);
 
-    assertEquals(19, first.injectionResult().instrumentedMethods());
+    assertEquals(25, first.injectionResult().instrumentedMethods());
     assertEquals(0, first.injectionResult().skippedInstrumentedMethods());
     String firstIndex = Files.readString(descriptor(outputDirectory));
 
     InstrumentationResult second = instrument(outputDirectory);
 
     assertEquals(0, second.injectionResult().instrumentedMethods());
-    assertEquals(19, second.injectionResult().skippedInstrumentedMethods());
+    assertEquals(25, second.injectionResult().skippedInstrumentedMethods());
     String secondIndex = Files.readString(descriptor(outputDirectory));
     assertEquals(firstIndex, secondIndex);
 

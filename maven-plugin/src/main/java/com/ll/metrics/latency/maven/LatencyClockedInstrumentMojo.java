@@ -96,7 +96,7 @@ public final class LatencyClockedInstrumentMojo extends AbstractMojo {
                 + " -> "
                 + timedMethod.timerId()
                 + " using "
-                + timedMethod.fieldName());
+                + timedMethod.timerFieldName());
       }
     }
   }

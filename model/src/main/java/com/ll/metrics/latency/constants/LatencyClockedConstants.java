@@ -1,5 +1,7 @@
 package com.ll.metrics.latency.constants;
 
+import com.ll.metrics.latency.timer.Timer;
+
 /** Shared generated names used by runtime startup and build-time instrumentation. */
 public final class LatencyClockedConstants {
   /** Path separator used in generated classpath resource names. */
@@ -31,6 +33,8 @@ public final class LatencyClockedConstants {
   public static final String BIND_METHOD = "__latency_clocked$bind";
   /** Prefix for generated timer field names. */
   public static final String TIMER_FIELD_PREFIX = "__latency_clocked_timer_";
+  /** Name of Timer record method {@link Timer#record(long)}. */
+  public static final String TIMER_RECORD_METHOD_NAME = "record";
 
   private LatencyClockedConstants() {}
 }

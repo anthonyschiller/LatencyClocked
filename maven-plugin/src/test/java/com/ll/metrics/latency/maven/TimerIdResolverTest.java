@@ -69,7 +69,7 @@ class TimerIdResolverTest {
   }
 
   @Test
-  void generatedFieldNamesAreAllocatedInMethodOrder() {
+  void generatedTimerFieldNamesAreAllocatedInMethodOrder() {
     List<TimedMethodMetadata> methods =
         resolver.resolve(
             "com.example.Service",
@@ -77,8 +77,8 @@ class TimerIdResolverTest {
                 new TimedMethodCandidate("first", "()V", false),
                 new TimedMethodCandidate("second", "()V", false)));
 
-    assertEquals("__latency_clocked_timer_0", methods.get(0).generatedFieldName());
-    assertEquals("__latency_clocked_timer_1", methods.get(1).generatedFieldName());
+    assertEquals("__latency_clocked_timer_0", methods.get(0).generatedTimerFieldName());
+    assertEquals("__latency_clocked_timer_1", methods.get(1).generatedTimerFieldName());
   }
 
   private static String oldDotDelimitedId(String className, TimedMethodCandidate candidate) {

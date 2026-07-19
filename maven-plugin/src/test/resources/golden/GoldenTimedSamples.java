@@ -21,6 +21,21 @@ public final class GoldenTimedSamples {
   }
 
   @Timed
+  public long longReturn(long value) {
+    return value + 1L;
+  }
+
+  @Timed
+  public float floatReturn(float value) {
+    return value + 1.0f;
+  }
+
+  @Timed
+  public double doubleReturn(double value) {
+    return value + 1.0d;
+  }
+
+  @Timed
   public String objectReturn(String value) {
     return "object:" + value;
   }
@@ -108,6 +123,37 @@ public final class GoldenTimedSamples {
   @Timed
   public void throwingMethod() {
     throw new IllegalStateException("boom");
+  }
+
+  @Timed
+  public int maybeThrow(boolean fail) {
+    if (fail) {
+      throw new IllegalStateException("boom");
+    }
+    return 42;
+  }
+
+  @Timed
+  public int exceptionThrownIfValueUnhandled(int value) {
+    if (value < 0) {
+      return -1;
+    }
+    if (value == 0) {
+      return 0;
+    }
+    throw new IllegalStateException("unhandled value");
+  }
+
+  @Timed
+  public int catchesInternally(boolean fail) {
+    try {
+      if (fail) {
+        throw new IllegalStateException("boom");
+      }
+      return 1;
+    } catch (IllegalStateException exception) {
+      return 2;
+    }
   }
 
   @Timed

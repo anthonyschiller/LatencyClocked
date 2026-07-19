@@ -86,7 +86,7 @@ public final class TimerFieldInjector {
       this.alreadyInstrumentedMethods = Set.copyOf(alreadyInstrumentedMethods);
       requiredFields =
           timedMethods.stream()
-              .map(TimedMethodDescriptorEntry::fieldName)
+              .map(TimedMethodDescriptorEntry::timerFieldName)
               .collect(Collectors.toSet());
     }
 
@@ -134,13 +134,13 @@ public final class TimerFieldInjector {
     @Override
     public void visitEnd() {
       for (TimedMethodDescriptorEntry timedMethod : timedMethods) {
-        if (existingFields.contains(timedMethod.fieldName())) {
+        if (existingFields.contains(timedMethod.timerFieldName())) {
           continue;
         }
         FieldVisitor fieldVisitor =
             super.visitField(
                 Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC | Opcodes.ACC_SYNTHETIC,
-                timedMethod.fieldName(),
+                timedMethod.timerFieldName(),
                 AsmConstants.TIMER_DESCRIPTOR,
                 null,
                 null);
@@ -148,7 +148,7 @@ public final class TimerFieldInjector {
           fieldVisitor.visitEnd();
         }
         injectedFields++;
-        existingFields.add(timedMethod.fieldName());
+        existingFields.add(timedMethod.timerFieldName());
       }
       if (!existingBindMethod) {
         BindMethodInjector.inject(cv, internalClassName, timedMethods);

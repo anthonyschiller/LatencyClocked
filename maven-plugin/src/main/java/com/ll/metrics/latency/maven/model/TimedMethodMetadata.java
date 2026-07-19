@@ -7,13 +7,13 @@ public record TimedMethodMetadata(
     String methodName,
     String methodDescriptor,
     boolean isStatic,
-    String generatedFieldName,
+    String generatedTimerFieldName,
     String resolvedTimerId) {
   /** Creates resolved timed method metadata. */
   public TimedMethodMetadata {
     Objects.requireNonNull(methodName, "methodName");
     Objects.requireNonNull(methodDescriptor, "methodDescriptor");
-    Objects.requireNonNull(generatedFieldName, "generatedFieldName");
+    Objects.requireNonNull(generatedTimerFieldName, "generatedTimerFieldName");
     Objects.requireNonNull(resolvedTimerId, "resolvedTimerId");
   }
 }
